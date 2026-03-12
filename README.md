@@ -37,6 +37,8 @@ This wizard will:
 - supports domestic providers (Moonshot/ZAI/MiniMax/Qianfan/Volcengine/BytePlus/Xiaomi/DeepSeek/Qwen)
 - supports self-hosted custom models (OpenAI-compatible / Anthropic-compatible)
 - ask for Feishu app/group settings
+- auto-detect current local Feishu defaults (if existing config is present)
+- keep 7-role mapping with 2 Feishu apps by default: `hot-search` (group router) + `ai-tech` (intel)
 - generate `.env`
 - run install + start automatically
 

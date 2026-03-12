@@ -63,6 +63,23 @@ prompt_secret_optional() {
   printf '%s' "${val}"
 }
 
+prompt_secret_with_default() {
+  local msg="$1"
+  local def="${2:-}"
+  local val
+  if [ -n "${def}" ]; then
+    read -r -s -p "${msg} (press Enter to reuse current value): " val
+    echo
+    if [ -z "${val}" ]; then
+      printf '%s' "${def}"
+    else
+      printf '%s' "${val}"
+    fi
+  else
+    prompt_secret_required "${msg}"
+  fi
+}
+
 confirm_yes() {
   local msg="$1"
   local ans
@@ -260,6 +277,7 @@ profile_state_dir() {
 
 main() {
   echo "=== OpenClaw Company Kit Bootstrap ==="
+  echo "Note: 7 role agents map to 2 Feishu apps by default (hot-search + ai-tech), not 7 separate apps."
 
   ensure_cmd openclaw openclaw
   ensure_cmd jq jq
@@ -271,6 +289,44 @@ main() {
   local ai_account_id ai_bot_name ai_app_id ai_app_secret
   local gh_token dashboard_port
   local with_ai_account
+  local local_cfg
+  local default_group_id default_hot_account_id default_hot_bot_name default_hot_app_id default_hot_app_secret
+  local default_ai_account_id default_ai_bot_name default_ai_app_id default_ai_app_secret
+
+  default_group_id="oc_replace_with_group_id"
+  default_hot_account_id="hot-search"
+  default_hot_bot_name="小龙虾 1 号"
+  default_hot_app_id=""
+  default_hot_app_secret=""
+  default_ai_account_id="ai-tech"
+  default_ai_bot_name="小龙虾 2 号"
+  default_ai_app_id=""
+  default_ai_app_secret=""
+
+  local_cfg="$(openclaw config file 2>/dev/null || true)"
+  if [ -n "${local_cfg}" ]; then
+    eval "local_cfg=${local_cfg}"
+  fi
+  if [ -n "${local_cfg}" ] && [ -f "${local_cfg}" ]; then
+    default_group_id="$(jq -r '.bindings[]? | select(.agentId=="rd-company" and .match.channel=="feishu") | .match.peer.id // empty' "${local_cfg}" | head -n1 || true)"
+    default_hot_account_id="$(jq -r '.bindings[]? | select(.agentId=="rd-company" and .match.channel=="feishu") | .match.accountId // empty' "${local_cfg}" | head -n1 || true)"
+    default_ai_account_id="$(jq -r '.bindings[]? | select(.agentId=="ai-tech" and .match.channel=="feishu") | .match.accountId // empty' "${local_cfg}" | head -n1 || true)"
+
+    [ -n "${default_group_id}" ] || default_group_id="oc_replace_with_group_id"
+    [ -n "${default_hot_account_id}" ] || default_hot_account_id="hot-search"
+    [ -n "${default_ai_account_id}" ] || default_ai_account_id="ai-tech"
+
+    default_hot_bot_name="$(jq -r --arg a "${default_hot_account_id}" '.channels.feishu.accounts[$a].botName // empty' "${local_cfg}" || true)"
+    default_hot_app_id="$(jq -r --arg a "${default_hot_account_id}" '.channels.feishu.accounts[$a].appId // empty' "${local_cfg}" || true)"
+    default_hot_app_secret="$(jq -r --arg a "${default_hot_account_id}" '.channels.feishu.accounts[$a].appSecret // empty' "${local_cfg}" || true)"
+
+    default_ai_bot_name="$(jq -r --arg a "${default_ai_account_id}" '.channels.feishu.accounts[$a].botName // empty' "${local_cfg}" || true)"
+    default_ai_app_id="$(jq -r --arg a "${default_ai_account_id}" '.channels.feishu.accounts[$a].appId // empty' "${local_cfg}" || true)"
+    default_ai_app_secret="$(jq -r --arg a "${default_ai_account_id}" '.channels.feishu.accounts[$a].appSecret // empty' "${local_cfg}" || true)"
+
+    [ -n "${default_hot_bot_name}" ] || default_hot_bot_name="小龙虾 1 号"
+    [ -n "${default_ai_bot_name}" ] || default_ai_bot_name="小龙虾 2 号"
+  fi
 
   profile="$(prompt_default "OpenClaw profile" "company")"
   company_name="$(prompt_default "Company name" "OpenClaw Company")"
@@ -280,18 +336,40 @@ main() {
   provider_select
   collect_provider_auth
 
-  group_id="$(prompt_required "Feishu group ID (oc_...)")"
-  hot_account_id="$(prompt_default "Feishu hot account id" "hot-search")"
-  hot_bot_name="$(prompt_default "Feishu hot bot name" "小龙虾 1 号")"
-  hot_app_id="$(prompt_required "Feishu hot app id (cli_...)")"
-  hot_app_secret="$(prompt_secret_required "Feishu hot app secret")"
+  group_id="$(prompt_default "Feishu group ID (oc_...)" "${default_group_id}")"
+  while [ -z "${group_id}" ] || [ "${group_id}" = "oc_replace_with_group_id" ]; do
+    echo "Feishu group ID cannot be empty."
+    group_id="$(prompt_required "Feishu group ID (oc_...)")"
+  done
 
-  if confirm_yes "Configure second Feishu account (ai-tech)?"; then
+  hot_account_id="$(prompt_default "Feishu hot account id" "${default_hot_account_id}")"
+  hot_bot_name="$(prompt_default "Feishu hot bot name" "${default_hot_bot_name}")"
+  hot_app_id="$(prompt_default "Feishu hot app id (cli_...)" "${default_hot_app_id}")"
+  while [ -z "${hot_app_id}" ]; do
+    echo "Feishu hot app id cannot be empty."
+    hot_app_id="$(prompt_required "Feishu hot app id (cli_...)")"
+  done
+
+  hot_app_secret="$(prompt_secret_with_default "Feishu hot app secret" "${default_hot_app_secret}")"
+  while [ -z "${hot_app_secret}" ]; do
+    echo "Feishu hot app secret cannot be empty."
+    hot_app_secret="$(prompt_secret_required "Feishu hot app secret")"
+  done
+
+  if confirm_yes "Configure second Feishu account (ai-tech, recommended for 7-role setup)?"; then
     with_ai_account=1
-    ai_account_id="$(prompt_default "Feishu ai account id" "ai-tech")"
-    ai_bot_name="$(prompt_default "Feishu ai bot name" "小龙虾 2 号")"
-    ai_app_id="$(prompt_required "Feishu ai app id (cli_...)")"
-    ai_app_secret="$(prompt_secret_required "Feishu ai app secret")"
+    ai_account_id="$(prompt_default "Feishu ai account id" "${default_ai_account_id}")"
+    ai_bot_name="$(prompt_default "Feishu ai bot name" "${default_ai_bot_name}")"
+    ai_app_id="$(prompt_default "Feishu ai app id (cli_...)" "${default_ai_app_id}")"
+    while [ -z "${ai_app_id}" ]; do
+      echo "Feishu ai app id cannot be empty."
+      ai_app_id="$(prompt_required "Feishu ai app id (cli_...)")"
+    done
+    ai_app_secret="$(prompt_secret_with_default "Feishu ai app secret" "${default_ai_app_secret}")"
+    while [ -z "${ai_app_secret}" ]; do
+      echo "Feishu ai app secret cannot be empty."
+      ai_app_secret="$(prompt_secret_required "Feishu ai app secret")"
+    done
   else
     with_ai_account=0
     ai_account_id="ai-tech"

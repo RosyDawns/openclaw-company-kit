@@ -17,6 +17,8 @@ Wizard actions:
 - includes domestic providers and custom self-hosted model options
 - input API key
 - input Feishu config
+- auto-detect existing local Feishu defaults (if available)
+- apply 7-role setup with 2 Feishu accounts by default (`hot-search` + `ai-tech`)
 - auto-generate `.env`
 - run install/start
 
