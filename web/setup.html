@@ -618,9 +618,11 @@
         try {
           const pf = await api("/api/preflight");
           if (!pf.allPassed) {
-            const failed = (pf.checks || []).filter(c => !c.ok).map(c => c.name);
-            setStatus(`环境检测未通过: ${failed.join(", ")}`, "err");
-            return;
+            const failed = (pf.checks || []).filter(c => !c.ok && c.blocking !== false).map(c => c.name);
+            if (failed.length > 0) {
+              setStatus(`环境检测未通过: ${failed.join(", ")}`, "err");
+              return;
+            }
           }
         } catch (err) {
           setStatus(`预检失败: ${err.message}`, "err");
