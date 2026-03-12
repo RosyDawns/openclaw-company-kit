@@ -584,14 +584,18 @@
 
       async function saveConfig() {
         const cfg = collectForm();
-        const miss = validateCore(cfg);
-        if (miss.length > 0) {
-          setStatus(`缺少必填: ${miss.join(", ")}`, "err");
-          return;
+        try {
+          await api("/api/config/save", { method: "POST", body: { config: cfg } });
+          state.config = cfg;
+          const miss = validateCore(cfg);
+          if (miss.length > 0) {
+            setStatus(`已保存（还需填写: ${miss.join(", ")}）`, "warn");
+          } else {
+            setStatus("已保存 .env", "ok");
+          }
+        } catch (err) {
+          setStatus(`保存失败: ${err.message}`, "err");
         }
-        await api("/api/config/save", { method: "POST", body: { config: cfg } });
-        state.config = cfg;
-        setStatus("已保存 .env", "ok");
       }
 
       async function startTask(path, body) {
