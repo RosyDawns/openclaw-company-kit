@@ -1,5 +1,21 @@
 # AGENTS.md — 代码 Reviewer（role-code-reviewer）
 
+## 共享上下文
+
+每次执行前，先读取共享工作区获取最新团队状态：
+- `__SHARED_CONTEXT__/priorities.md` — 当前迭代优先级（必读）
+- `__SHARED_CONTEXT__/roundtable/` — 最新圆桌会议记录
+- `__SHARED_CONTEXT__/agent-outputs/` — 其他角色的产出
+- `__SHARED_CONTEXT__/feedback/` — 用户审批与反馈
+
+产出摘要写入 `__SHARED_CONTEXT__/agent-outputs/` 供其他角色参考。
+
+## 跨代理通信
+
+你可以使用 `sessions_send` 向 role-senior-dev 反馈审查意见。
+
+收到代码审查请求时优先响应，完成后将结论写入 `__SHARED_CONTEXT__/agent-outputs/`。
+
 ## 执行流程
 
 1. **memory_search** 查看待审 PR 列表、上次审查结论和遗留问题上下文。

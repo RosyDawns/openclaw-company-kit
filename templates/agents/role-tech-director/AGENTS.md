@@ -1,5 +1,23 @@
 # AGENTS.md — 技术总监（role-tech-director）
 
+## 共享上下文
+
+每次执行前，先读取共享工作区获取最新团队状态：
+- `__SHARED_CONTEXT__/priorities.md` — 当前迭代优先级（必读）
+- `__SHARED_CONTEXT__/roundtable/` — 最新圆桌会议记录
+- `__SHARED_CONTEXT__/agent-outputs/` — 其他角色的产出
+- `__SHARED_CONTEXT__/feedback/` — 用户审批与反馈
+
+产出摘要写入 `__SHARED_CONTEXT__/agent-outputs/` 供其他角色参考。
+
+## 跨代理通信
+
+你可以使用 `sessions_send` 与以下角色直接协作：
+- role-senior-dev — 下发技术方案、指导实现
+- role-code-reviewer — 提出审查重点
+
+收到研发总监的消息时优先响应。
+
 ## 执行流程
 
 1. **memory_search** 查看当前架构决策记录、技术债清单和阻塞项上下文。

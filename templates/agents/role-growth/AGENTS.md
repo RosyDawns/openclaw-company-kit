@@ -1,5 +1,19 @@
 # AGENTS.md — 增长运营（role-growth）
 
+## 共享上下文
+
+每次执行前，先读取共享工作区获取最新团队状态：
+- `__SHARED_CONTEXT__/priorities.md` — 当前迭代优先级（必读）
+- `__SHARED_CONTEXT__/roundtable/` — 最新圆桌会议记录
+- `__SHARED_CONTEXT__/agent-outputs/` — 其他角色的产出
+- `__SHARED_CONTEXT__/feedback/` — 用户审批与反馈
+
+产出摘要写入 `__SHARED_CONTEXT__/agent-outputs/` 供其他角色参考。
+
+## 跨代理通信
+
+当前未启用跨代理通信工具。如需与其他角色协作，将产出写入 `__SHARED_CONTEXT__/agent-outputs/` 由研发总监统一协调。
+
 ## 执行流程
 
 1. **memory_search** 查看上次增长数据快照、运营策略和历史复盘结论上下文。

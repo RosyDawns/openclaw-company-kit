@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "defaults": {
+    "security": "deny",
+    "ask": "off",
+    "askFallback": "deny",
+    "autoAllowSkills": true
+  },
+  "agents": {
+    "rd-company": {
+      "security": "allowlist",
+      "ask": "off",
+      "allowlist": [
+        {"pattern": "*/gh"},
+        {"pattern": "*/git"},
+        {"pattern": "*/jq"},
+        {"pattern": "*/curl"},
+        {"pattern": "*/cat"},
+        {"pattern": "*/ls"},
+        {"pattern": "*/head"},
+        {"pattern": "*/tail"},
+        {"pattern": "*/grep"},
+        {"pattern": "*/rg"}
+      ]
+    },
+    "role-senior-dev": {
+      "security": "allowlist",
+      "ask": "off",
+      "allowlist": [
+        {"pattern": "*/gh"},
+        {"pattern": "*/git"},
+        {"pattern": "*/npm"},
+        {"pattern": "*/npx"},
+        {"pattern": "*/node"},
+        {"pattern": "*/python3"},
+        {"pattern": "*/pip"},
+        {"pattern": "*/make"},
+        {"pattern": "*/rg"},
+        {"pattern": "*/curl"},
+        {"pattern": "*/cat"},
+        {"pattern": "*/ls"},
+        {"pattern": "*/head"},
+        {"pattern": "*/tail"},
+        {"pattern": "*/grep"},
+        {"pattern": "*/diff"},
+        {"pattern": "*/mkdir"},
+        {"pattern": "*/cp"},
+        {"pattern": "*/mv"}
+      ]
+    },
+    "role-code-reviewer": {
+      "security": "allowlist",
+      "ask": "off",
+      "allowlist": [
+        {"pattern": "*/gh"},
+        {"pattern": "*/git"},
+        {"pattern": "*/rg"},
+        {"pattern": "*/diff"},
+        {"pattern": "*/cat"},
+        {"pattern": "*/ls"},
+        {"pattern": "*/head"},
+        {"pattern": "*/tail"},
+        {"pattern": "*/grep"}
+      ]
+    },
+    "role-qa-test": {
+      "security": "allowlist",
+      "ask": "off",
+      "allowlist": [
+        {"pattern": "*/gh"},
+        {"pattern": "*/git"},
+        {"pattern": "*/npm"},
+        {"pattern": "*/npx"},
+        {"pattern": "*/node"},
+        {"pattern": "*/python3"},
+        {"pattern": "*/pytest"},
+        {"pattern": "*/curl"},
+        {"pattern": "*/cat"},
+        {"pattern": "*/ls"},
+        {"pattern": "*/head"},
+        {"pattern": "*/tail"},
+        {"pattern": "*/rg"},
+        {"pattern": "*/grep"}
+      ]
+    },
+    "role-tech-director": {
+      "security": "allowlist",
+      "ask": "off",
+      "allowlist": [
+        {"pattern": "*/gh"},
+        {"pattern": "*/git"},
+        {"pattern": "*/rg"},
+        {"pattern": "*/diff"},
+        {"pattern": "*/cat"},
+        {"pattern": "*/ls"},
+        {"pattern": "*/head"},
+        {"pattern": "*/tail"},
+        {"pattern": "*/grep"}
+      ]
+    }
+  }
+}

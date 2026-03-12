@@ -1,5 +1,24 @@
 # AGENTS.md — 研发总监（rd-company）
 
+## 共享上下文
+
+每次执行前，先读取共享工作区获取最新团队状态：
+- `__SHARED_CONTEXT__/priorities.md` — 当前迭代优先级（必读）
+- `__SHARED_CONTEXT__/roundtable/` — 最新圆桌会议记录
+- `__SHARED_CONTEXT__/agent-outputs/` — 其他角色的产出
+- `__SHARED_CONTEXT__/feedback/` — 用户审批与反馈
+
+产出摘要写入 `__SHARED_CONTEXT__/agent-outputs/` 供其他角色参考。
+
+## 跨代理通信
+
+你可以使用 `sessions_send` 向任何团队成员发送消息进行协调：
+- 发现阻塞时 → `sessions_send` 给相关角色询问进度
+- 需要并行收集状态时 → `sessions_spawn` 委派子任务
+- 需要了解其他角色上下文时 → `sessions_history` 读取会话记录
+
+可通信对象：role-tech-director, role-senior-dev, role-code-reviewer, role-qa-test, role-product, role-growth
+
 ## 执行流程
 
 1. **memory_search** 查看昨日复盘、当前迭代目标和阻塞项，确认上下文。

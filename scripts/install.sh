@@ -33,7 +33,28 @@ if [ ! -f "${SOURCE_CONFIG_PATH}" ]; then
   exit 1
 fi
 
+SHARED_CONTEXT_DIR="${PROFILE_DIR}/shared-context"
+
 mkdir -p "${PROFILE_DIR}" "${TARGET_WORKSPACE}" "${TARGET_AGENTS_DIR}" "${TARGET_DASHBOARD_DIR}"
+mkdir -p "${SHARED_CONTEXT_DIR}"/{roundtable,agent-outputs,feedback,kpis}
+
+if [ ! -f "${SHARED_CONTEXT_DIR}/priorities.md" ]; then
+  cat > "${SHARED_CONTEXT_DIR}/priorities.md" <<'PRIORITIES'
+# 当前迭代优先级
+
+> 所有角色每次执行前必读。由研发总监或产品经理维护。
+
+## P0 — 必须完成
+
+## P1 — 应该完成
+
+## P2 — 可以推迟
+
+---
+*最后更新: 待填写*
+PRIORITIES
+fi
+
 if [ "${SOURCE_CONFIG_PATH}" != "${PROFILE_DIR}/openclaw.json" ]; then
   cp "${SOURCE_CONFIG_PATH}" "${PROFILE_DIR}/openclaw.json"
 fi
@@ -54,6 +75,7 @@ for agent_id in hot-search ai-tech rd-company role-product role-tech-director ro
         -e "s|__COMPANY_NAME__|${COMPANY_NAME}|g" \
         -e "s|__FEISHU_HOT_BOT_NAME__|${FEISHU_HOT_BOT_NAME}|g" \
         -e "s|__FEISHU_AI_BOT_NAME__|${FEISHU_AI_BOT_NAME}|g" \
+        -e "s|__SHARED_CONTEXT__|${SHARED_CONTEXT_DIR}|g" \
         "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
     fi
   done
@@ -89,15 +111,38 @@ jq \
   (if $modelPrimary != "" then .agents.defaults.model.primary = $modelPrimary else . end) |
   .agents.list = [
     {"id":"main","default":true,"name":"主助手","workspace":($stateDir + "/workspace")},
-    {"id":"hot-search","name":"热点推荐","workspace":($stateDir + "/agents/hot-search")},
-    {"id":"ai-tech","name":"AI科技","workspace":($stateDir + "/agents/ai-tech")},
-    {"id":"rd-company","name":"公司研发中台","workspace":($stateDir + "/agents/rd-company"),"identity":{"name":"研发总监"}},
-    {"id":"role-product","name":"产品经理","workspace":($stateDir + "/agents/role-product"),"identity":{"name":"产品经理"}},
-    {"id":"role-tech-director","name":"技术总监","workspace":($stateDir + "/agents/role-tech-director"),"identity":{"name":"技术总监"}},
-    {"id":"role-senior-dev","name":"高级程序员","workspace":($stateDir + "/agents/role-senior-dev"),"identity":{"name":"高级程序员"}},
-    {"id":"role-growth","name":"增长运营","workspace":($stateDir + "/agents/role-growth"),"identity":{"name":"增长运营"}},
-    {"id":"role-code-reviewer","name":"代码Reviewer","workspace":($stateDir + "/agents/role-code-reviewer"),"identity":{"name":"代码Reviewer"}},
-    {"id":"role-qa-test","name":"测试工程师","workspace":($stateDir + "/agents/role-qa-test"),"identity":{"name":"测试工程师"}}
+    {"id":"hot-search","name":"热点推荐","workspace":($stateDir + "/agents/hot-search"),
+     "tools":{"deny":["exec","group:runtime","group:fs","group:sessions"]}},
+    {"id":"ai-tech","name":"AI科技","workspace":($stateDir + "/agents/ai-tech"),
+     "tools":{"deny":["exec","group:runtime","group:fs","group:sessions"]}},
+    {"id":"rd-company","name":"公司研发中台","workspace":($stateDir + "/agents/rd-company"),
+     "identity":{"name":"研发总监"},
+     "tools":{"allow":["exec","read","write","edit","gh-issues","sessions_send","sessions_spawn","sessions_list","sessions_history","session_status"]},
+     "subagents":{"allowAgents":["role-tech-director","role-senior-dev","role-code-reviewer","role-qa-test","role-product","role-growth"],"maxSpawnDepth":2}},
+    {"id":"role-product","name":"产品经理","workspace":($stateDir + "/agents/role-product"),
+     "identity":{"name":"产品经理"},
+     "tools":{"allow":["read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["exec","group:runtime","write","edit","apply_patch"]}},
+    {"id":"role-tech-director","name":"技术总监","workspace":($stateDir + "/agents/role-tech-director"),
+     "identity":{"name":"技术总监"},
+     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["write","edit","apply_patch"]},
+     "subagents":{"allowAgents":["role-senior-dev","role-code-reviewer"]}},
+    {"id":"role-senior-dev","name":"高级程序员","workspace":($stateDir + "/agents/role-senior-dev"),
+     "identity":{"name":"高级程序员"},
+     "tools":{"allow":["exec","read","write","edit","apply_patch","gh-issues","sessions_send","sessions_list","sessions_history","session_status"]},
+     "subagents":{"allowAgents":["role-code-reviewer","role-qa-test"]}},
+    {"id":"role-growth","name":"增长运营","workspace":($stateDir + "/agents/role-growth"),
+     "identity":{"name":"增长运营"},
+     "tools":{"deny":["exec","group:runtime","group:fs","group:sessions"]}},
+    {"id":"role-code-reviewer","name":"代码Reviewer","workspace":($stateDir + "/agents/role-code-reviewer"),
+     "identity":{"name":"代码Reviewer"},
+     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["write","edit","apply_patch"]}},
+    {"id":"role-qa-test","name":"测试工程师","workspace":($stateDir + "/agents/role-qa-test"),
+     "identity":{"name":"测试工程师"},
+     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["write","edit","apply_patch"]}}
   ] |
   .bindings = (
     [
@@ -153,14 +198,23 @@ jq \
   .commands.restart = true |
   .commands.ownerDisplay = "raw" |
   .tools.profile = "messaging" |
+  .tools.agentToAgent = {"enabled": true, "allow": ["rd-company","role-tech-director","role-senior-dev","role-code-reviewer","role-qa-test","role-product","role-growth"]} |
   .messages.ackReactionScope = "group-mentions" |
   .session.dmScope = "per-channel-peer" |
+  .session.agentToAgent = {"maxPingPongTurns": 3} |
   .skills = (.skills // {}) |
   .skills.entries = (.skills.entries // {}) |
   (if $ghToken != "" then .skills.entries["gh-issues"] = {"apiKey": $ghToken} else . end)
   ' "${PROFILE_DIR}/openclaw.json" > "${tmp_cfg}"
 
 mv "${tmp_cfg}" "${PROFILE_DIR}/openclaw.json"
+
+# Deploy exec-approvals (command-level allowlist)
+EXEC_APPROVALS_TEMPLATE="${ROOT_DIR}/templates/exec-approvals.template.json"
+if [ -f "${EXEC_APPROVALS_TEMPLATE}" ]; then
+  cp "${EXEC_APPROVALS_TEMPLATE}" "${PROFILE_DIR}/exec-approvals.json"
+  echo "[install] exec-approvals deployed"
+fi
 
 # Deploy dashboard bundle
 rsync -a --delete --exclude '__pycache__' "${ROOT_DIR}/dashboard/rd-dashboard/" "${TARGET_DASHBOARD_DIR}/"

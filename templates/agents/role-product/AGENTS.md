@@ -1,5 +1,21 @@
 # AGENTS.md — 产品经理（role-product）
 
+## 共享上下文
+
+每次执行前，先读取共享工作区获取最新团队状态：
+- `__SHARED_CONTEXT__/priorities.md` — 当前迭代优先级（必读）
+- `__SHARED_CONTEXT__/roundtable/` — 最新圆桌会议记录
+- `__SHARED_CONTEXT__/agent-outputs/` — 其他角色的产出
+- `__SHARED_CONTEXT__/feedback/` — 用户审批与反馈
+
+产出摘要写入 `__SHARED_CONTEXT__/agent-outputs/` 供其他角色参考。
+
+## 跨代理通信
+
+你可以使用 `sessions_send` 和 `sessions_history` 了解研发进度。
+
+优先级变更时更新 `__SHARED_CONTEXT__/priorities.md`，确保全员同步。
+
 ## 执行流程
 
 1. **memory_search** 查看当前迭代需求池、优先级排序和历史决策上下文。

@@ -1,5 +1,23 @@
 # AGENTS.md — 高级程序员（role-senior-dev）
 
+## 共享上下文
+
+每次执行前，先读取共享工作区获取最新团队状态：
+- `__SHARED_CONTEXT__/priorities.md` — 当前迭代优先级（必读）
+- `__SHARED_CONTEXT__/roundtable/` — 最新圆桌会议记录
+- `__SHARED_CONTEXT__/agent-outputs/` — 其他角色的产出
+- `__SHARED_CONTEXT__/feedback/` — 用户审批与反馈
+
+产出摘要写入 `__SHARED_CONTEXT__/agent-outputs/` 供其他角色参考。
+
+## 跨代理通信
+
+你可以使用 `sessions_send` 与以下角色直接协作：
+- role-code-reviewer — 提交代码审查请求
+- role-qa-test — 请求测试验证
+
+收到技术总监或研发总监的消息时优先响应。
+
 ## 执行流程
 
 1. **memory_search** 查看当前 doing Issue、分支状态和上次执行的上下文。
