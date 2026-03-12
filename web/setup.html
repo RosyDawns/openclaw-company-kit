@@ -540,6 +540,17 @@
 
         if (key === "step-run") {
           refreshServiceStatus();
+          if (state.taskId) {
+            api(`/api/task/${state.taskId}`).then(data => {
+              const task = data.task || {};
+              const logs = Array.isArray(task.logs) ? task.logs : [];
+              const logEl = byId("taskLog");
+              const tipsEl = byId("taskTips");
+              if (logEl) { logEl.value = logs.join("\n"); logEl.scrollTop = logEl.scrollHeight; }
+              if (tipsEl) tipsEl.textContent = `任务 ${task.id || "-"} 状态: ${task.status || "-"}`;
+              if (task.status === "running") pollTask();
+            }).catch(() => {});
+          }
           api("/api/preflight").then(pf => {
             const el = byId("preflightResult");
             if (!el) return;
@@ -604,6 +615,12 @@
         const data = await api(path, { method: "POST", body });
         state.taskId = data.taskId;
         setStatus(`任务启动: ${state.taskId}`, "warn");
+        const runIdx = steps.findIndex(s => s.id === "step-run");
+        if (runIdx >= 0 && state.stepIdx !== runIdx) {
+          state.stepIdx = runIdx;
+          updateStepNav();
+          renderPanel();
+        }
         pollTask();
       }
 
