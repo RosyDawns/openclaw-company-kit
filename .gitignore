@@ -31,7 +31,7 @@ __pycache__/
 htmlcov/
 
 # RIPER-5 workspace (local session data)
-project_document/
+# project_document/
 *.bak
 
 # Backups

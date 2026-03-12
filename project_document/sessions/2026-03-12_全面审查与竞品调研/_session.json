@@ -1,0 +1,15 @@
+{
+  "name": "全面审查与竞品调研",
+  "created": "2026-03-12",
+  "mode": "full",
+  "status": "active",
+  "phase": "PLAN_DETAILED",
+  "goal": "全面审查项目移植性问题，调研线上同类方案，对比分析并提出优化建议",
+  "stages": {
+    "RESEARCH": "in_progress",
+    "INNOVATE": "pending",
+    "PLAN": "pending",
+    "EXECUTE": "pending",
+    "REVIEW": "pending"
+  }
+}
