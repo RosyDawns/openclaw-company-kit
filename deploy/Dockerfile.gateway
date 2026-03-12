@@ -1,0 +1,11 @@
+FROM node:22-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends curl jq && rm -rf /var/lib/apt/lists/*
+RUN npm i -g @anthropics/openclaw
+
+FROM base AS runtime
+WORKDIR /app
+COPY scripts/ scripts/
+COPY templates/ templates/
+COPY dashboard/ dashboard/
+COPY .env.example .env.example
+CMD ["sh", "-c", "openclaw --profile ${OPENCLAW_PROFILE:-company} gateway start --foreground"]

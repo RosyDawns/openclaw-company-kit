@@ -1,15 +1,12 @@
 services:
   openclaw-gateway:
-    image: node:22-slim
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.gateway
     restart: unless-stopped
     env_file: ../.env
-    working_dir: /app
     volumes:
-      - ..:/app:ro
       - openclaw-data:/root/.openclaw-${OPENCLAW_PROFILE:-company}
-    command: >
-      sh -c "npm i -g @anthropics/openclaw &&
-             openclaw --profile ${OPENCLAW_PROFILE:-company} gateway start --foreground"
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-3000}:3000"
     healthcheck:
@@ -19,14 +16,13 @@ services:
       retries: 3
 
   dashboard:
-    image: python:3.12-slim
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.dashboard
     restart: unless-stopped
     env_file: ../.env
-    working_dir: /app
     volumes:
-      - ..:/app:ro
       - openclaw-data:/root/.openclaw-${OPENCLAW_PROFILE:-company}
-    command: python3 scripts/control_server.py --port 8788
     ports:
       - "127.0.0.1:${DASHBOARD_PORT:-8788}:8788"
 

@@ -1,0 +1,12 @@
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends jq curl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY scripts/ scripts/
+COPY web/ web/
+COPY dashboard/ dashboard/
+COPY templates/ templates/
+COPY .env.example .env.example
+
+EXPOSE 8788
+CMD ["python3", "scripts/control_server.py", "--port", "8788"]

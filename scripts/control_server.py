@@ -7,10 +7,14 @@ Runs a local web UI for step-by-step setup and service control.
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import threading
@@ -88,6 +92,7 @@ TASK_MAX_LOG_LINES = 1200
 TASKS: dict[str, dict] = {}
 TASK_LOCK = threading.Lock()
 SERVER_PORT = 8788
+AUTH_TOKEN: str | None = None
 
 
 def now_text() -> str:
@@ -372,8 +377,29 @@ class ControlHandler(BaseHTTPRequestHandler):
     server_version = "OpenClawControl/1.0"
 
     def log_message(self, fmt: str, *args) -> None:
-        # Keep terminal output concise.
         _ = fmt, args
+
+    def end_headers(self) -> None:
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        super().end_headers()
+
+    def _check_auth(self) -> bool:
+        if AUTH_TOKEN is None:
+            return True
+        auth = self.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:].strip()
+            return hmac.compare_digest(token, AUTH_TOKEN)
+        if auth.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(auth[6:].strip()).decode("utf-8")
+                _, password = decoded.split(":", 1)
+                return hmac.compare_digest(password, AUTH_TOKEN)
+            except Exception:
+                return False
+        return False
 
     def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -445,6 +471,10 @@ class ControlHandler(BaseHTTPRequestHandler):
             self._redirect("/setup")
             return
 
+        if path.startswith("/api/") and not self._check_auth():
+            self._send_json({"ok": False, "error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+            return
+
         if path == "/setup":
             self._serve_file(WEB_DIR / "setup.html")
             return
@@ -492,6 +522,10 @@ class ControlHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # pylint: disable=invalid-name
         path = urlparse(self.path).path
+
+        if not self._check_auth():
+            self._send_json({"ok": False, "error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
+            return
 
         try:
             payload = self._read_json()
@@ -561,13 +595,15 @@ class ControlHandler(BaseHTTPRequestHandler):
 def main() -> None:
     parser = argparse.ArgumentParser(description="OpenClaw Company Kit control server")
     parser.add_argument("--port", type=int, default=8788, help="Server port")
+    parser.add_argument("--token", type=str, default=None, help="Bearer token for API auth (omit to disable)")
     args = parser.parse_args()
 
     if args.port < 1 or args.port > 65535:
         raise SystemExit("port must be in [1, 65535]")
 
-    global SERVER_PORT  # pylint: disable=global-statement
+    global SERVER_PORT, AUTH_TOKEN  # pylint: disable=global-statement
     SERVER_PORT = args.port
+    AUTH_TOKEN = args.token or os.environ.get("CONTROL_TOKEN")
 
     WEB_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -575,6 +611,8 @@ def main() -> None:
     print(f"[control] root={ROOT_DIR}")
     print(f"[control] setup:     http://127.0.0.1:{args.port}/setup")
     print(f"[control] dashboard: http://127.0.0.1:{args.port}/dashboard/")
+    if AUTH_TOKEN:
+        print(f"[control] auth:      Bearer token enabled")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

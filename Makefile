@@ -1,4 +1,4 @@
-.PHONY: launch install start stop health check backup restore clean
+.PHONY: launch install start stop health check backup restore clean hook
 
 launch:
 	bash scripts/launch.sh
@@ -27,6 +27,11 @@ restore:
 
 test:
 	python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+hook:
+	cp scripts/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+	@echo "pre-commit hook installed"
 
 clean:
 	bash scripts/stop.sh 2>/dev/null || true

@@ -29,6 +29,8 @@ jobs:
           bash -n scripts/healthcheck.sh
           bash -n scripts/watchdog.sh
           bash -n scripts/onboard-wrapper.sh
+          bash -n scripts/backup.sh
+          bash -n scripts/restore.sh
           bash -n scripts/demo-up.sh
           bash -n scripts/demo-down.sh
           bash -n scripts/release-check.sh
@@ -56,6 +58,11 @@ jobs:
           jq -e . templates/exec-approvals.template.json >/dev/null
           jq -e . docker/demo_data/dashboard-data.json >/dev/null
           jq -e . docker/demo_data/business-metrics.json >/dev/null
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Unit tests
         run: |

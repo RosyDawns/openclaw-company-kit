@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Pre-commit hook — copy to .git/hooks/pre-commit or run: make hook
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "${ROOT_DIR}"
+
+echo "[pre-commit] shell syntax..."
+for f in scripts/*.sh docker/entrypoint.sh; do
+  [ -f "$f" ] && bash -n "$f"
+done
+
+echo "[pre-commit] JSON validation..."
+for f in templates/*.json templates/*.template.json; do
+  [ -f "$f" ] && jq -e . "$f" >/dev/null
+done
+
+echo "[pre-commit] python syntax..."
+for f in scripts/control_server.py dashboard/rd-dashboard/dashboard_data.py; do
+  [ -f "$f" ] && python3 -m py_compile "$f"
+done
+
+echo "[pre-commit] all checks passed"

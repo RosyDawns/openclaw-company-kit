@@ -73,11 +73,13 @@ if ! ocp gateway start 2>/dev/null; then
   echo "[WARN] gateway may not be running. If healthcheck fails, run: openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
 fi
 
+REFRESH_INTERVAL="${REFRESH_INTERVAL:-300}"
+
 cd "${TARGET_DASHBOARD_DIR}"
 ./refresh.sh >/dev/null 2>&1 || true
 
-start_bg "dashboard-refresh-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./refresh.sh; sleep 300; done"
-start_bg "issue-sync-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./issue-sync.sh; sleep 300; done"
+start_bg "dashboard-refresh-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./refresh.sh; sleep ${REFRESH_INTERVAL}; done"
+start_bg "issue-sync-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./issue-sync.sh; sleep ${REFRESH_INTERVAL}; done"
 start_bg "watchdog" "cd '${ROOT_DIR}' && bash scripts/watchdog.sh"
 
 echo "[OK] services started"
