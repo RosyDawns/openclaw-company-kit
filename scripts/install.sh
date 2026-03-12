@@ -15,10 +15,14 @@ PROFILE_CONFIG_PATH="$(expand_tilde_path "${PROFILE_CONFIG_PATH:-}")"
 
 if [ -n "${SOURCE_OPENCLAW_CONFIG:-}" ]; then
   SOURCE_CONFIG_PATH="$(expand_tilde_path "${SOURCE_OPENCLAW_CONFIG}")"
-elif [ -n "${PROFILE_CONFIG_PATH}" ] && [ -f "${PROFILE_CONFIG_PATH}" ]; then
-  SOURCE_CONFIG_PATH="${PROFILE_CONFIG_PATH}"
-else
-  SOURCE_CONFIG_PATH="$(expand_tilde_path "$(openclaw config file)")"
+fi
+
+if [ -z "${SOURCE_CONFIG_PATH:-}" ] || [ ! -f "${SOURCE_CONFIG_PATH:-}" ]; then
+  if [ -n "${PROFILE_CONFIG_PATH}" ] && [ -f "${PROFILE_CONFIG_PATH}" ]; then
+    SOURCE_CONFIG_PATH="${PROFILE_CONFIG_PATH}"
+  else
+    SOURCE_CONFIG_PATH="$(expand_tilde_path "$(openclaw config file 2>/dev/null || true)")"
+  fi
 fi
 
 if [ ! -f "${SOURCE_CONFIG_PATH}" ]; then
