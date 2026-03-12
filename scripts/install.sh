@@ -107,7 +107,7 @@ jq \
   '
   .agents.defaults.workspace = ($stateDir + "/workspace") |
   .agents.defaults.heartbeat = {"every": "30m", "target": "last", "activeHours": {"start": "08:00", "end": "22:00"}} |
-  .agents.defaults.compaction = {"mode": "safeguard"} |
+  .agents.defaults.compaction = {"mode": "safeguard", "memoryFlush": {"enabled": true, "softThresholdTokens": 4000}} |
   (if $modelPrimary != "" then .agents.defaults.model.primary = $modelPrimary else . end) |
   .agents.list = [
     {"id":"main","default":true,"name":"主助手","workspace":($stateDir + "/workspace")},

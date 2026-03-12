@@ -63,6 +63,7 @@ cd "${TARGET_DASHBOARD_DIR}"
 
 start_bg "dashboard-refresh-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./refresh.sh; sleep 300; done"
 start_bg "issue-sync-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./issue-sync.sh; sleep 300; done"
+start_bg "watchdog" "cd '${ROOT_DIR}' && bash scripts/watchdog.sh"
 
 echo "[OK] services started"
 echo "Profile: ${OPENCLAW_PROFILE}"

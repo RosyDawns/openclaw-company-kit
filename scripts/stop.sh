@@ -32,6 +32,7 @@ stop_pid() {
   rm -f "${pid_file}"
 }
 
+stop_pid "watchdog"
 stop_pid "dashboard-refresh-loop"
 stop_pid "issue-sync-loop"
 
