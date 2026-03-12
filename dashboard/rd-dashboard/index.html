@@ -1,0 +1,1185 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>公司研发驾驶舱</title>
+    <style>
+      :root {
+        --bg-0: #06131f;
+        --bg-1: #0b2233;
+        --bg-2: #12324a;
+        --glass: rgba(255, 255, 255, 0.1);
+        --glass-strong: rgba(255, 255, 255, 0.16);
+        --line: rgba(255, 255, 255, 0.22);
+        --text: #eaf5ff;
+        --muted: #a9c2d6;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --err: #ef4444;
+        --brand: #38bdf8;
+        --brand-2: #2dd4bf;
+        --shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+        --radius-lg: 20px;
+        --radius: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "Avenir Next", "SF Pro Display", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+        background:
+          radial-gradient(1200px 700px at -8% -18%, rgba(45, 212, 191, 0.22), transparent 65%),
+          radial-gradient(1100px 680px at 108% -20%, rgba(56, 189, 248, 0.2), transparent 70%),
+          linear-gradient(165deg, var(--bg-0), var(--bg-1) 45%, var(--bg-2));
+      }
+
+      .orb {
+        position: fixed;
+        border-radius: 50%;
+        pointer-events: none;
+        filter: blur(12px);
+        z-index: 0;
+        animation: drift 16s ease-in-out infinite;
+      }
+
+      .orb.a {
+        width: 360px;
+        height: 360px;
+        left: -120px;
+        top: 80px;
+        background: radial-gradient(circle at 35% 35%, rgba(56, 189, 248, 0.28), transparent 72%);
+      }
+
+      .orb.b {
+        width: 320px;
+        height: 320px;
+        right: -120px;
+        top: 260px;
+        background: radial-gradient(circle at 35% 35%, rgba(45, 212, 191, 0.24), transparent 72%);
+        animation-delay: -5s;
+      }
+
+      .app {
+        position: relative;
+        z-index: 1;
+        max-width: 1380px;
+        margin: 0 auto;
+        padding: 18px 14px 32px;
+      }
+
+      .glass {
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.08));
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: var(--shadow);
+      }
+
+      .topbar {
+        padding: 14px;
+        position: sticky;
+        top: 8px;
+        z-index: 20;
+      }
+
+      .head {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: 0.3px;
+      }
+
+      .meta {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .ops {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn {
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.14);
+        color: var(--text);
+        border-radius: 10px;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: transform 0.18s ease, background 0.18s ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .tabs {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .subtabs {
+        margin-top: 8px;
+        gap: 6px;
+      }
+
+      .tab {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 8px 13px;
+        font-size: 12px;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.22s ease;
+      }
+
+      .tab:hover {
+        background: rgba(255, 255, 255, 0.16);
+      }
+
+      .tab.active {
+        border-color: rgba(45, 212, 191, 0.55);
+        background: linear-gradient(135deg, rgba(45, 212, 191, 0.32), rgba(56, 189, 248, 0.26));
+        color: #ffffff;
+      }
+
+      .subtab {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 6px 11px;
+        font-size: 11px;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .subtab.active {
+        color: #ffffff;
+        border-color: rgba(56, 189, 248, 0.45);
+        background: rgba(56, 189, 248, 0.22);
+      }
+
+      .view {
+        margin-top: 16px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .kpi-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+
+      .kpi {
+        padding: 14px;
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .kpi .k {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .kpi .v {
+        margin-top: 6px;
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .kpi .h {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .panel {
+        padding: 14px;
+      }
+
+      .panel h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        letter-spacing: 0.2px;
+      }
+
+      .split {
+        grid-template-columns: 1.2fr 1fr;
+      }
+
+      .triple {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .list {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .list li {
+        margin: 6px 0;
+        color: #d7e9f6;
+        line-height: 1.45;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        font-size: 12px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.26);
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .chip.ok {
+        color: #a7f3d0;
+        border-color: rgba(34, 197, 94, 0.45);
+      }
+
+      .chip.warn {
+        color: #fde68a;
+        border-color: rgba(245, 158, 11, 0.45);
+      }
+
+      .chip.err {
+        color: #fecaca;
+        border-color: rgba(239, 68, 68, 0.45);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 9px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+        text-align: left;
+        font-size: 12px;
+      }
+
+      th {
+        color: #c9dfef;
+        font-weight: 600;
+      }
+
+      td {
+        color: #dff0fb;
+      }
+
+      a {
+        color: #7dd3fc;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .progress {
+        height: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .progress > i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--brand-2), var(--brand));
+        transition: width 0.45s ease;
+      }
+
+      .hero-card {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 12px;
+      }
+
+      .role-hero {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 12px;
+      }
+
+      .card {
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.1);
+        padding: 12px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+      }
+
+      .empty {
+        text-align: center;
+        padding: 32px 12px;
+        color: var(--muted);
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(12px);
+        animation: rise 0.42s cubic-bezier(0.2, 0.75, 0.3, 1) forwards;
+      }
+
+      @keyframes rise {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes drift {
+        0% {
+          transform: translateY(0px) translateX(0px);
+        }
+        50% {
+          transform: translateY(-12px) translateX(10px);
+        }
+        100% {
+          transform: translateY(0px) translateX(0px);
+        }
+      }
+
+      @media (max-width: 1180px) {
+        .kpi-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .split,
+        .hero-card,
+        .role-hero {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .title {
+          font-size: 20px;
+        }
+
+        .head {
+          flex-direction: column;
+        }
+
+        .ops {
+          justify-content: flex-start;
+        }
+
+        .kpi-grid,
+        .triple {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="orb a"></div>
+    <div class="orb b"></div>
+
+    <div class="app">
+      <header class="topbar glass">
+        <div class="head">
+          <div>
+            <h1 class="title">公司研发驾驶舱</h1>
+            <div id="metaLine" class="meta">加载中...</div>
+          </div>
+          <div class="ops">
+            <label class="switch"><input id="autoRefresh" type="checkbox" checked />自动刷新</label>
+            <span>下次刷新：<b id="refreshTick">--</b></span>
+            <button id="refreshBtn" class="btn">立即刷新</button>
+          </div>
+        </div>
+        <nav id="navTabs" class="tabs"></nav>
+        <nav id="subTabs" class="tabs subtabs"></nav>
+      </header>
+
+      <main id="viewHost" class="view"></main>
+    </div>
+
+    <script>
+      const ROLE_LABELS = {
+        "rd-company": "研发中台",
+        "role-product": "产品经理",
+        "role-tech-director": "技术总监",
+        "role-senior-dev": "高级程序员",
+        "role-code-reviewer": "代码 Reviewer",
+        "role-qa-test": "测试工程师",
+        "role-growth": "增长运营",
+      };
+
+      const ROLE_ORDER = [
+        "rd-company",
+        "role-product",
+        "role-tech-director",
+        "role-senior-dev",
+        "role-code-reviewer",
+        "role-qa-test",
+        "role-growth",
+      ];
+
+      const state = {
+        data: null,
+        views: [],
+        currentView: "overview",
+        refreshSec: 120,
+        remainSec: 120,
+        timer: null,
+        tickTimer: null,
+        loading: false,
+      };
+
+      function esc(v) {
+        return String(v ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function n(v) {
+        const x = Number(v);
+        return Number.isFinite(x) ? x : 0;
+      }
+
+      function pct(v) {
+        return `${Math.max(0, Math.min(100, n(v)))}%`;
+      }
+
+      function formatMoney(v, currency = "CNY") {
+        const x = n(v);
+        try {
+          return new Intl.NumberFormat("zh-CN", {
+            style: "currency",
+            currency: currency || "CNY",
+            maximumFractionDigits: 0,
+          }).format(x);
+        } catch (_) {
+          return `${currency || "CNY"} ${Math.round(x).toLocaleString("zh-CN")}`;
+        }
+      }
+
+      function issueUrlMap(data) {
+        const map = new Map();
+        (data.github?.issues || []).forEach((i) => map.set(String(i.number), i.url || "#"));
+        return map;
+      }
+
+      function linkifyIssueRefs(text, issueMap) {
+        const raw = String(text || "");
+        const re = /#(\d+)/g;
+        let out = "";
+        let last = 0;
+        let m;
+        while ((m = re.exec(raw)) !== null) {
+          out += esc(raw.slice(last, m.index));
+          const num = m[1];
+          const url = issueMap.get(num);
+          if (url) out += `<a href="${esc(url)}" target="_blank" rel="noopener">#${esc(num)}</a>`;
+          else out += `#${esc(num)}`;
+          last = re.lastIndex;
+        }
+        out += esc(raw.slice(last));
+        return out;
+      }
+
+      function ago(text) {
+        if (!text) return "-";
+        const dt = new Date(String(text).replace(" ", "T"));
+        if (Number.isNaN(dt.getTime())) return text;
+        const sec = Math.floor((Date.now() - dt.getTime()) / 1000);
+        if (sec < 60) return `${sec}s 前`;
+        if (sec < 3600) return `${Math.floor(sec / 60)}m 前`;
+        if (sec < 86400) return `${Math.floor(sec / 3600)}h 前`;
+        return `${Math.floor(sec / 86400)}d 前`;
+      }
+
+      function statusChip(status) {
+        if (status === "done" || status === "ok" || status === "healthy") return `<span class="chip ok">${esc(status)}</span>`;
+        if (status === "blocked" || status === "error" || status === "err") return `<span class="chip err">${esc(status)}</span>`;
+        return `<span class="chip warn">${esc(status || "-")}</span>`;
+      }
+
+      function roleTitle(id) {
+        return ROLE_LABELS[id] || id;
+      }
+
+      function issueStats(data) {
+        return data.github?.issueStats || {};
+      }
+
+      function currentSubTabs(viewId) {
+        if (viewId === "overview") {
+          return [
+            { id: "sec-flow", label: "执行链路" },
+            { id: "sec-finance", label: "财务经营" },
+            { id: "sec-radar", label: "项目情报" },
+          ];
+        }
+        if (viewId === "runtime") {
+          return [
+            { id: "sec-runtime-cron", label: "调度状态" },
+            { id: "sec-runtime-feed", label: "动态流" },
+            { id: "sec-runtime-link", label: "连接数据源" },
+          ];
+        }
+        return [
+          { id: "sec-role-status", label: "角色状态" },
+          { id: "sec-role-issues", label: "关联Issue" },
+          { id: "sec-role-timeline", label: "时间轴" },
+        ];
+      }
+
+      function renderSubTabs() {
+        const host = document.getElementById("subTabs");
+        const tabs = currentSubTabs(state.currentView);
+        host.innerHTML = tabs
+          .map((t, idx) => `<button class="subtab ${idx === 0 ? "active" : ""}" data-target="${esc(t.id)}">${esc(t.label)}</button>`)
+          .join("");
+      }
+
+      function collectViews(data) {
+        const base = [
+          { id: "overview", label: "总览" },
+          { id: "runtime", label: "运行态" },
+        ];
+
+        const roleIds = new Set();
+        (data.agentPanel || []).forEach((a) => {
+          if (a.id === "rd-company" || String(a.id || "").startsWith("role-")) roleIds.add(a.id);
+        });
+
+        const roleViews = ROLE_ORDER.filter((id) => roleIds.has(id)).map((id) => ({
+          id,
+          label: roleTitle(id),
+        }));
+
+        return [...base, ...roleViews];
+      }
+
+      async function loadData() {
+        const res = await fetch(`./dashboard-data.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error(`加载失败 (${res.status})`);
+        return res.json();
+      }
+
+      function renderTabs() {
+        const host = document.getElementById("navTabs");
+        host.innerHTML = state.views
+          .map((v) => {
+            const active = v.id === state.currentView ? "active" : "";
+            return `<button class="tab ${active}" data-view="${esc(v.id)}">${esc(v.label)}</button>`;
+          })
+          .join("");
+      }
+
+      function setMetaLine(data) {
+        const stats = issueStats(data);
+        const company = data.company?.stats || {};
+        const line = [
+          `更新时间 ${data.generatedAt || "-"}`,
+          `群 ${data.group?.id || "-"}`,
+          `活跃智能体 ${n(company.activeAgents)}/${n(company.totalAgents)}`,
+          `Open ${n(stats.open)} / Doing ${n(stats.doing)} / Blocked ${n(stats.blocked)}`,
+          `GitHub ${data.githubAuth?.ok ? "已连接" : "异常"}`,
+        ].join(" ｜ ");
+        document.getElementById("metaLine").textContent = line;
+      }
+
+      function renderOverview(data) {
+        const stats = issueStats(data);
+        const company = data.company?.stats || {};
+        const milestones = data.milestones || [];
+        const blockers = data.blockersBoard || [];
+        const risks = data.risksBoard || [];
+        const radar = data.businessRadar || {};
+        const biz = data.businessMetrics || {};
+        const issueMap = issueUrlMap(data);
+        const hasBiz = Object.keys(biz).length > 0;
+        const bizSource = hasBiz ? (biz.isReal ? `真实数据 · ${biz.period || "当前周期"}` : `估算数据 · ${biz.source || "-"}`) : "未接入财务数据";
+
+        const kpi = [
+          ["智能体总数", n(company.totalAgents), "角色规模"],
+          ["活跃智能体", n(company.activeAgents), "近 24h"],
+          ["平均进度", `${n(company.avgProgress)}%`, "角色任务进度"],
+          ["Open Issue", n(stats.open), "待处理任务"],
+          ["Blocked", n(stats.blocked), "阻塞风险"],
+          ["Done", n(stats.done), "已完成"],
+        ];
+
+        const blockerItems = [];
+        blockers.forEach((b) => (b.items || []).forEach((x) => blockerItems.push({ kind: "阻塞", owner: b.name, text: x })));
+        risks.forEach((b) => (b.items || []).forEach((x) => blockerItems.push({ kind: "风险", owner: b.name, text: x })));
+
+        const milestoneCards = milestones.slice(0, 4);
+        const highlights = Array.isArray(radar.highlights) ? radar.highlights.slice(0, 6) : [];
+
+        return `
+          <section id="sec-flow" class="grid kpi-grid">
+            ${kpi
+              .map(
+                (item, idx) => `
+                  <article class="kpi reveal" style="animation-delay:${idx * 38}ms">
+                    <div class="k">${esc(item[0])}</div>
+                    <div class="v">${esc(item[1])}</div>
+                    <div class="h">${esc(item[2])}</div>
+                  </article>
+                `
+              )
+              .join("")}
+          </section>
+
+          <section id="sec-finance" class="grid triple" style="margin-top:12px;">
+            <article class="panel glass reveal">
+              <h2>财务总览</h2>
+              <div class="chips" style="margin-bottom:8px;">
+                <span class="chip ${biz.isReal ? "ok" : "warn"}">${esc(bizSource)}</span>
+              </div>
+              <div class="card">
+                <h3>净收入</h3>
+                <div style="font-size:24px; font-weight:700;">${formatMoney(biz.netRevenue, biz.currency || "CNY")}</div>
+                <div class="muted">总收入 ${formatMoney(biz.revenue, biz.currency || "CNY")} · 退款 ${formatMoney(biz.refundAmount, biz.currency || "CNY")}</div>
+                ${
+                  hasBiz
+                    ? ""
+                    : '<div class="muted" style="margin-top:8px;">提示：请接入 business-metrics.json 后可展示真实经营数据。</div>'
+                }
+              </div>
+            </article>
+            <article class="panel glass reveal" style="animation-delay:60ms">
+              <h2>转化漏斗</h2>
+              <div class="card">
+                <h3>线索 → 试学 → 付费</h3>
+                <ul class="list">
+                  <li>线索 ${esc(n(biz.leads))}，试学 ${esc(n(biz.trialUsers))}，付费 ${esc(n(biz.paidUsers))}</li>
+                  <li>线索转试学 ${esc(n(biz.leadToTrialRate))}% · 试学转付费 ${esc(n(biz.trialToPaidRate))}%</li>
+                  <li>总转化 ${esc(n(biz.leadToPaidRate))}%</li>
+                </ul>
+              </div>
+            </article>
+            <article class="panel glass reveal" style="animation-delay:120ms">
+              <h2>经营效率</h2>
+              <div class="card">
+                <h3>CAC 与回款</h3>
+                <ul class="list">
+                  <li>CAC ${formatMoney(biz.cac, biz.currency || "CNY")} · ARPU ${formatMoney(biz.arpu, biz.currency || "CNY")}</li>
+                  <li>退款率 ${esc(n(biz.refundRate))}% · 回款周期 ${esc(n(biz.cashInDays))} 天</li>
+                  <li class="muted">${esc(biz.notes || "暂无经营备注")}</li>
+                </ul>
+              </div>
+            </article>
+          </section>
+
+          <section class="grid hero-card" style="margin-top:12px;">
+            <article class="panel glass reveal">
+              <h2>里程碑进度</h2>
+              ${
+                milestoneCards.length
+                  ? milestoneCards
+                      .map(
+                        (m) => `
+                          <div class="card" style="margin-bottom:10px;">
+                            <h3>${esc(m.name || "-")}</h3>
+                            <div class="chips" style="margin-bottom:8px;">
+                              ${statusChip(m.status)}
+                              <span class="chip">截止 ${esc(m.deadline || "-")}</span>
+                              <span class="chip">负责人 ${esc(m.owner || "-")}</span>
+                            </div>
+                            <div class="progress"><i style="width:${pct(m.progress)}"></i></div>
+                          </div>
+                        `
+                      )
+                      .join("")
+                  : '<div class="empty">暂无里程碑数据</div>'
+              }
+            </article>
+
+            <article id="sec-radar" class="panel glass reveal" style="animation-delay:90ms">
+              <h2>项目情报与风险摘要</h2>
+              <div class="card" style="margin-bottom:10px;">
+                <h3>情报雷达</h3>
+                <div class="muted" style="font-size:12px; margin-bottom:8px;">${esc(radar.generatedAt || "暂无时间")}</div>
+                ${highlights.length ? `<ul class="list">${highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul>` : '<div class="empty">暂无情报摘要</div>'}
+              </div>
+              <div class="card">
+                <h3>阻塞/风险 Top</h3>
+                ${
+                  blockerItems.length
+                    ? `<ul class="list">${blockerItems
+                        .slice(0, 8)
+                        .map((x) => `<li>${linkifyIssueRefs(`${x.kind}｜${x.owner}：${x.text}`, issueMap)}</li>`)
+                        .join("")}</ul>`
+                    : '<div class="empty">当前无阻塞/风险项</div>'
+                }
+              </div>
+            </article>
+          </section>
+
+        `;
+      }
+
+      function deriveFeed(data) {
+        const feed = (data.activityFeed || []).slice(0, 12);
+        if (feed.length) return feed;
+
+        const fallback = [];
+        (data.cronJobs || []).slice(0, 12).forEach((j) => {
+          fallback.push({
+            time: j.lastRun,
+            title: `调度 ${j.name}`,
+            detail: `${j.lastRunStatus || "-"} / ${j.lastDeliveryStatus || "-"}`,
+            level: j.level || "warn",
+          });
+        });
+        return fallback;
+      }
+
+      function renderRuntime(data) {
+        const cronRows = data.cronJobs || [];
+        const feed = deriveFeed(data);
+        const sources = data.dataSources || {};
+        const issueMap = issueUrlMap(data);
+
+        return `
+          <section class="grid split">
+            <article id="sec-runtime-cron" class="panel glass reveal">
+              <h2>调度任务状态</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>任务</th><th>Agent</th><th>状态</th><th>计划</th><th>下次</th><th>最近</th></tr>
+                  </thead>
+                  <tbody>
+                    ${
+                      cronRows.length
+                        ? cronRows
+                            .map(
+                              (j) => `
+                                <tr>
+                                  <td>${esc(j.name)}</td>
+                                  <td>${esc(j.agentId || "-")}</td>
+                                  <td>${statusChip(j.level || (j.enabled ? "ok" : "warn"))}</td>
+                                  <td>${esc(j.schedule || "-")}</td>
+                                  <td>${esc(j.enabled ? j.nextRun || "-" : "已停用")}</td>
+                                  <td>${esc(j.lastRunStatus || "-")} / ${esc(j.lastDeliveryStatus || "-")}</td>
+                                </tr>
+                              `
+                            )
+                            .join("")
+                        : '<tr><td colspan="6" class="muted">暂无调度数据</td></tr>'
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article id="sec-runtime-feed" class="panel glass reveal" style="animation-delay:80ms">
+              <h2>动态流（最近 12 条）</h2>
+              ${
+                feed.length
+                  ? `<ul class="list">${feed
+                      .map(
+                        (r) =>
+                          `<li><b>${esc(r.title || "-")}</b> · ${esc(ago(r.time || ""))}<br /><span class="muted">${linkifyIssueRefs(r.detail || "-", issueMap)}</span></li>`
+                      )
+                      .join("")}</ul>`
+                  : '<div class="empty">暂无动态</div>'
+              }
+            </article>
+          </section>
+
+          <section id="sec-runtime-link" class="grid triple" style="margin-top:12px;">
+            <article class="panel glass reveal"><h2>数据源</h2><div class="chips">${Object.entries(sources)
+              .map(([k, v]) => `<span class="chip">${esc(k)}: ${esc(v || "-")}</span>`)
+              .join("")}</div></article>
+            <article class="panel glass reveal" style="animation-delay:60ms"><h2>项目链接</h2><ul class="list"><li>仓库：${esc(data.project?.repoSlug || "-")}</li><li>分支：${esc(data.project?.branch || "-")}</li><li>工作区改动：${esc(data.project?.dirtyFiles ?? "-")} 个</li></ul></article>
+            <article class="panel glass reveal" style="animation-delay:120ms"><h2>服务健康</h2><ul class="list"><li>GitHub：${data.githubAuth?.ok ? "已连接" : "异常"}</li><li>群路由：${esc(data.group?.routeAgent || "-")}</li><li>最新生成：${esc(data.generatedAt || "-")}</li></ul></article>
+          </section>
+        `;
+      }
+
+      function buildRoleTimeline(data, roleId, agent) {
+        const rows = [];
+        const title = roleTitle(roleId);
+
+        (agent.today || []).slice(0, 8).forEach((t, idx) => {
+          rows.push({
+            time: agent.lastActive || "",
+            label: "今日进展",
+            detail: t,
+            rank: 100 - idx,
+          });
+        });
+
+        (agent.blockers || []).slice(0, 4).forEach((t, idx) => {
+          rows.push({
+            time: agent.lastActive || "",
+            label: "阻塞更新",
+            detail: t,
+            rank: 90 - idx,
+          });
+        });
+
+        (data.activityFeed || []).forEach((f) => {
+          const blob = `${f.title || ""} ${f.detail || ""}`;
+          if (blob.includes(roleId) || blob.includes(title)) {
+            rows.push({
+              time: f.time || "",
+              label: f.title || "动态更新",
+              detail: f.detail || "",
+              rank: 80,
+            });
+          }
+        });
+
+        (data.cronJobs || [])
+          .filter((j) => j.agentId === roleId)
+          .forEach((j) =>
+            rows.push({
+              time: j.lastRun || "",
+              label: `调度 · ${j.name}`,
+              detail: `最近执行 ${j.lastRunStatus || "-"} / 投递 ${j.lastDeliveryStatus || "-"}`,
+              rank: 70,
+            })
+          );
+
+        rows.sort((a, b) => {
+          const ta = a.time ? new Date(String(a.time).replace(" ", "T")).getTime() : 0;
+          const tb = b.time ? new Date(String(b.time).replace(" ", "T")).getTime() : 0;
+          if (tb !== ta) return tb - ta;
+          return (b.rank || 0) - (a.rank || 0);
+        });
+
+        const seen = new Set();
+        return rows
+          .filter((r) => {
+            const key = `${r.label}::${r.detail}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, 12);
+      }
+
+      function renderRoleView(data, roleId) {
+        const agent = (data.agentPanel || []).find((x) => x.id === roleId);
+        if (!agent) {
+          return `<article class="panel glass empty">未找到角色 ${esc(roleTitle(roleId))} 的数据。</article>`;
+        }
+
+        const issues = (data.github?.issues || []).filter((i) => (i.owners || []).includes(roleId));
+        const openIssues = issues.filter((i) => i.state === "open");
+        const cron = (data.cronJobs || []).filter((j) => j.agentId === roleId);
+        const issueMap = issueUrlMap(data);
+        const timeline = buildRoleTimeline(data, roleId, agent);
+
+        return `
+          <section id="sec-role-status" class="grid role-hero">
+            <article class="panel glass reveal">
+              <h2>${esc(roleTitle(roleId))} · 角色看板</h2>
+              <div class="chips" style="margin-bottom:10px;">
+                ${statusChip(agent.health || "warn")}
+                ${statusChip(agent.activityLevel || "idle")}
+                <span class="chip">会话 ${esc(agent.sessions ?? 0)}</span>
+                <span class="chip">最近活跃 ${esc(ago(agent.lastActive || ""))}</span>
+              </div>
+              <div class="card" style="margin-bottom:8px;">
+                <h3>当前焦点</h3>
+                <div class="muted">${esc(agent.focus || "未设置")}</div>
+                <div style="margin-top:8px;">进度：${pct(agent.progress?.percent)}</div>
+                <div class="progress" style="margin-top:6px;"><i style="width:${pct(agent.progress?.percent)}"></i></div>
+                <div class="muted" style="margin-top:8px;">${esc(agent.progress?.summary || "暂无进度摘要")}</div>
+              </div>
+              <div class="card">
+                <h3>证据与备注</h3>
+                <ul class="list">
+                  <li>进度证据：${esc(agent.progressEvidence || "-")}</li>
+                  <li>近期备注：${esc(agent.recentNote || "-")}</li>
+                  <li>所有者：${esc(agent.owner || "-")}</li>
+                </ul>
+              </div>
+            </article>
+
+            <article class="panel glass reveal" style="animation-delay:70ms">
+              <h2>今日任务与阻塞</h2>
+              <div class="card" style="margin-bottom:10px;">
+                <h3>今日输出</h3>
+                ${(agent.today || []).length ? `<ul class="list">${agent.today.slice(0, 8).map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : '<div class="empty">暂无今日输出</div>'}
+              </div>
+              <div class="card">
+                <h3>阻塞项 (${n(agent.blockerCount)})</h3>
+                ${
+                  (agent.blockers || []).length
+                    ? `<ul class="list">${agent.blockers
+                        .slice(0, 8)
+                        .map((t) => `<li>${linkifyIssueRefs(t, issueMap)}</li>`)
+                        .join("")}</ul>`
+                    : '<div class="empty">暂无阻塞</div>'
+                }
+              </div>
+            </article>
+          </section>
+
+          <section class="grid split" style="margin-top:12px;">
+            <article id="sec-role-issues" class="panel glass reveal">
+              <h2>关联 Issue（${issues.length}）</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>#</th><th>标题</th><th>状态</th><th>优先级</th><th>截止</th><th>更新时间</th></tr>
+                  </thead>
+                  <tbody>
+                    ${
+                      issues.length
+                        ? issues
+                            .slice(0, 20)
+                            .map(
+                              (i) => `
+                                <tr>
+                                  <td>#${esc(i.number)}</td>
+                                  <td><a href="${esc(i.url || "#")}" target="_blank" rel="noopener">${esc(i.title || "")}</a></td>
+                                  <td>${statusChip(i.status || "todo")}</td>
+                                  <td>${esc(i.priority || "-")}</td>
+                                  <td>${esc(i.scheduleDue || "-")}</td>
+                                  <td>${esc(ago(i.updatedAt || ""))}</td>
+                                </tr>
+                              `
+                            )
+                            .join("")
+                        : '<tr><td colspan="6" class="muted">暂无该角色关联 Issue</td></tr>'
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article id="sec-role-timeline" class="panel glass reveal" style="animation-delay:70ms">
+              <h2>该角色调度与建议</h2>
+              <div class="card" style="margin-bottom:10px;">
+                <h3>时间轴（今日）</h3>
+                ${
+                  timeline.length
+                    ? `<ul class="list">${timeline
+                        .map(
+                          (t) =>
+                            `<li><b>${esc(t.label)}</b> · ${esc(ago(t.time || ""))}<br /><span class="muted">${linkifyIssueRefs(
+                              t.detail || "-",
+                              issueMap
+                            )}</span></li>`
+                        )
+                        .join("")}</ul>`
+                    : '<div class="empty">暂无时间轴记录</div>'
+                }
+              </div>
+              <div class="card" style="margin-bottom:10px;">
+                <h3>调度任务</h3>
+                ${
+                  cron.length
+                    ? `<ul class="list">${cron.map((j) => `<li>${esc(j.name)} · ${statusChip(j.level || "warn")} · 下次 ${esc(j.nextRun || "-")}</li>`).join("")}</ul>`
+                    : '<div class="empty">暂无绑定调度任务</div>'
+                }
+              </div>
+              <div class="card">
+                <h3>动作建议</h3>
+                <ul class="list">
+                  <li>当前 Open Issue：${openIssues.length} 项，建议优先处理 P0/P1 且临近截止事项。</li>
+                  <li>若状态长期不变，请在 Issue 评论补充 commit/PR 证据。</li>
+                  <li>若存在阻塞，先补充阻塞原因与所需支持人，避免“看板假进展”。</li>
+                </ul>
+              </div>
+            </article>
+          </section>
+        `;
+      }
+
+      function renderActiveView() {
+        if (!state.data) return;
+        const host = document.getElementById("viewHost");
+
+        let html = "";
+        if (state.currentView === "overview") html = renderOverview(state.data);
+        else if (state.currentView === "runtime") html = renderRuntime(state.data);
+        else html = renderRoleView(state.data, state.currentView);
+
+        host.innerHTML = html;
+      }
+
+      function setView(viewId, syncHash = true) {
+        const valid = state.views.some((v) => v.id === viewId);
+        state.currentView = valid ? viewId : "overview";
+        renderTabs();
+        renderActiveView();
+        renderSubTabs();
+        if (syncHash) {
+          const h = `#${state.currentView}`;
+          if (location.hash !== h) history.replaceState(null, "", h);
+        }
+      }
+
+      async function reloadAll() {
+        if (state.loading) return;
+        state.loading = true;
+        const btn = document.getElementById("refreshBtn");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "刷新中...";
+        }
+        try {
+          state.data = await loadData();
+          state.views = collectViews(state.data);
+          setMetaLine(state.data);
+          renderTabs();
+          const hashView = (location.hash || "").replace("#", "");
+          const target = hashView || state.currentView || "overview";
+          setView(target, false);
+        } catch (err) {
+          document.getElementById("viewHost").innerHTML = `<article class="panel glass empty">加载失败：${esc(err.message || err)}</article>`;
+        } finally {
+          state.loading = false;
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "立即刷新";
+          }
+        }
+      }
+
+      function bindEvents() {
+        document.getElementById("navTabs").addEventListener("click", (e) => {
+          const btn = e.target.closest(".tab[data-view]");
+          if (!btn) return;
+          setView(btn.dataset.view, true);
+        });
+
+        document.getElementById("subTabs").addEventListener("click", (e) => {
+          const btn = e.target.closest(".subtab[data-target]");
+          if (!btn) return;
+          document.querySelectorAll("#subTabs .subtab").forEach((x) => x.classList.remove("active"));
+          btn.classList.add("active");
+          const target = document.getElementById(btn.dataset.target);
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+
+        document.getElementById("refreshBtn").addEventListener("click", async () => {
+          state.remainSec = state.refreshSec;
+          await reloadAll();
+        });
+
+        window.addEventListener("hashchange", () => {
+          const hashView = (location.hash || "").replace("#", "") || "overview";
+          setView(hashView, false);
+        });
+      }
+
+      function stopAutoRefresh() {
+        if (state.timer) clearInterval(state.timer);
+        if (state.tickTimer) clearInterval(state.tickTimer);
+        state.timer = null;
+        state.tickTimer = null;
+      }
+
+      function startAutoRefresh() {
+        stopAutoRefresh();
+        state.remainSec = state.refreshSec;
+        const tickEl = document.getElementById("refreshTick");
+        tickEl.textContent = `${state.remainSec}s`;
+
+        state.tickTimer = setInterval(() => {
+          state.remainSec = Math.max(0, state.remainSec - 1);
+          tickEl.textContent = `${state.remainSec}s`;
+        }, 1000);
+
+        state.timer = setInterval(async () => {
+          state.remainSec = state.refreshSec;
+          await reloadAll();
+        }, state.refreshSec * 1000);
+      }
+
+      function initAutoRefresh() {
+        const checkbox = document.getElementById("autoRefresh");
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) startAutoRefresh();
+          else {
+            stopAutoRefresh();
+            document.getElementById("refreshTick").textContent = "已暂停";
+          }
+        });
+        startAutoRefresh();
+      }
+
+      (async function init() {
+        bindEvents();
+        await reloadAll();
+        initAutoRefresh();
+      })();
+    </script>
+  </body>
+</html>

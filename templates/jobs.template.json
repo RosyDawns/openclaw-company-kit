@@ -1,0 +1,114 @@
+{
+  "jobs": [
+    {
+      "name": "项目情报雷达",
+      "agent": "ai-tech",
+      "cron": "0 * * * *",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "你是项目总监情报参谋。输出《项目情报雷达简报》纯文本；项目=__PROJECT_NAME__。约束：最多1次外部检索，失败立即降级为基于GitHub项目现状与已知事实，不得反复重试；禁止“待核实/暂无/-”；必须给出负责人和可执行动作；全文<=700字。结构：1)一句话判断 2)机会/风险Top3(结论/影响/动作) 3)相似项目Top2(借鉴点/我方动作) 4)本周必执行Top3(负责人/截止/指标) 5)今日两条动作。只输出正文，不解释过程。"
+    },
+    {
+      "name": "研发晨会",
+      "agent": "rd-company",
+      "cron": "30 9 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "请输出研发晨会（证据版）：1) 今日唯一目标 2) 角色任务分配（总监/产品/技术总监/高级程序员/代码Reviewer/测试/增长）3) 今日任务看板（负责人|状态|截止时间|验收标准|证据）。硬规则：若无证据，状态只能 todo/blocked，证据字段写“未检测到提交或Issue变更”；禁止写完成。"
+    },
+    {
+      "name": "研发午间同步",
+      "agent": "rd-company",
+      "cron": "30 13 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "请输出研发午间同步（证据版）：A) 截至当前完成项 B) 进行中事项 C) 阻塞项 D) 需总监决策项 E) 下午Top3行动。每条必须包含：事项类型(plan/code/ops)|负责人|状态(todo/doing/done/blocked)|截止时间|证据。证据格式：code类型必须是commit哈希+文件路径或PR编号；plan/ops类型可用会议纪要或文档路径。硬规则：code类型若无commit/PR证据，不得写done/doing，只能todo/blocked并标注未检测到代码提交。"
+    },
+    {
+      "name": "研发晚间复盘",
+      "agent": "rd-company",
+      "cron": "30 20 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "请输出研发晚间复盘（证据版）：1) 今日完成 2) 未完成及原因 3) 指标变化 4) 明日优先级Top5。每条任务必须附证据字段（commit/issue/pr）；无证据只能标记为未完成或待开始，禁止虚构进度。"
+    },
+    {
+      "name": "研发周计划",
+      "agent": "rd-company",
+      "cron": "0 10 * * 1",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "请输出周计划（证据版）：本周目标、关键里程碑、角色分工、风险、验收标准与看板。看板每项必须含：负责人|状态|截止日|证据。无证据项一律标注“待验证”，禁止写已完成。"
+    },
+    {
+      "name": "角色进度同步-产品经理",
+      "agent": "role-product",
+      "cron": "2,32 8-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "PM writable mode. Repo __PROJECT_REPO__ only. Each run must do at least one write action via gh issue comment or gh issue edit label. Focus owner:role-product open issues. If evidence missing or requirement unclear, set status:blocked and include reason owner decision-deadline. Never set done without evidence. Output: issue action status-change evidence-link handoff."
+    },
+    {
+      "name": "角色进度同步-技术总监",
+      "agent": "role-tech-director",
+      "cron": "4,34 8-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "TechDirector writable mode. Repo __PROJECT_REPO__ only. Each run must do at least one write action via gh issue comment or gh issue edit label. Focus p0/p1 or owner:role-tech-director issues. Provide one technical decision and DoD. If blocked, set status:blocked with impact owner decision-deadline. Never set done without evidence. Output: issue decision status-change evidence-link downstream-step."
+    },
+    {
+      "name": "角色进度同步-代码Reviewer",
+      "agent": "role-code-reviewer",
+      "cron": "6,36 8-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "Reviewer writable mode. Repo __PROJECT_REPO__ only. Each run must do at least one write action via gh pr comment/review or gh issue comment/edit label. Priority: owner:role-code-reviewer open issues, then blocked p0/p1 issues. If no evidence, do not mark done. Output: issue action decision status-change evidence-link next-step."
+    },
+    {
+      "name": "角色进度同步-测试工程师",
+      "agent": "role-qa-test",
+      "cron": "9,39 8-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "你是测试工程师执行器（可写模式）。仅操作仓库 __PROJECT_REPO__。目标：对待测事项执行最小回归验证，并把测试结论回写到 PR/Issue。允许操作：运行测试命令、gh pr comment、gh issue comment/edit label。硬规则：1) 优先处理 owner:role-qa-test 或与 open PR 关联的 doing issue。2) 每次至少执行 1 条可复现验证命令，并记录结果。3) 测试通过且 PR 已合并：Issue 置 status:done，并附证据。4) 测试失败：Issue 置 status:blocked，写缺陷、影响、复现步骤、建议修复。5) 证据不足不得标记 done。输出格式：目标Issue/PR、测试动作与命令、结果（pass/fail/blocked）、证据（日志片段、PR、commit、评论链接）。"
+    },
+    {
+      "name": "代码执行-高级程序员",
+      "agent": "role-senior-dev",
+      "cron": "*/30 8-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 900,
+      "thinking": "minimal",
+      "message": "你是高级程序员执行器，不是状态同步器。目标：每次运行必须产出真实研发证据（commit/PR/issue评论），否则视为失败并把问题标记 blocked。硬规则：1) 仅操作仓库 __PROJECT_REPO__，本地目录 __PROJECT_PATH__。2) 只处理 owner:role-senior-dev 的 open issue。3) WIP=1：同一轮只允许 1 个 doing。若发现多个 doing，只保留最高优先级且最早开始的一项，其他改 todo 并注明原因。4) 无真实执行证据（commit 或 open PR）不得把 issue 置为 doing。5) 若无法继续，必须置为 blocked 并写清阻塞原因与所需支持。执行流程：A读取issue并排序 B创建分支 C完成最小可验收改动 D执行最小验证 E提交commit（含#issue）F推送并创建/更新PR G在issue回写证据 H更新状态。输出：目标Issue、本轮动作、状态变更、证据、下一步。"
+    }
+  ]
+}

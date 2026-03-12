@@ -1,0 +1,213 @@
+{
+  "roles": [
+    {
+      "id": "director",
+      "name": "总监",
+      "owner": "你",
+      "daily_routine": [
+        "09:30 晨会定目标",
+        "13:30 午间决策",
+        "20:30 晚间复盘"
+      ],
+      "focus": "确保本周核心目标聚焦：前端转 AI Agent 的课程交付与转化",
+      "progress": {
+        "percent": 45,
+        "status": "on_track",
+        "summary": "目标与节奏已建立，进入执行稳定期"
+      },
+      "today": [
+        "确认本周唯一北极星指标",
+        "清理低优先级需求",
+        "推进课程 MVP 验收"
+      ],
+      "blockers": [
+        "课程任务验收标准仍需细化"
+      ]
+    },
+    {
+      "id": "product",
+      "name": "产品经理",
+      "owner": "role-product",
+      "daily_routine": [
+        "10:00 需求梳理",
+        "15:00 体验检查",
+        "18:00 验收清单更新"
+      ],
+      "focus": "学习路径拆解、任务验收标准、用户体验闭环",
+      "progress": {
+        "percent": 38,
+        "status": "watch",
+        "summary": "大纲明确，周任务粒度仍需统一"
+      },
+      "today": [
+        "补齐第 1-2 周验收口径",
+        "输出课程任务模板",
+        "整理用户常见卡点"
+      ],
+      "blockers": [
+        "缺少学员访谈样本"
+      ]
+    },
+    {
+      "id": "tech_director",
+      "name": "技术总监",
+      "owner": "role-tech-director",
+      "daily_routine": [
+        "10:30 架构巡检",
+        "16:30 风险评估",
+        "21:00 质量门禁复核"
+      ],
+      "focus": "OpenClaw 编排、数据采集、课程平台稳定性",
+      "progress": {
+        "percent": 52,
+        "status": "on_track",
+        "summary": "群路由与调度已上线，等待更多业务流接入"
+      },
+      "today": [
+        "完成研发群路由收敛",
+        "优化 cron 任务投递策略",
+        "补可观测看板"
+      ],
+      "blockers": [
+        "存在 feishu 插件重复加载告警"
+      ]
+    },
+    {
+      "id": "senior_dev",
+      "name": "高级程序员",
+      "owner": "role-senior-dev",
+      "daily_routine": [
+        "11:00 核心开发",
+        "17:00 测试与修复",
+        "22:00 提交与复查"
+      ],
+      "focus": "功能开发、自动化脚本、可视化实现",
+      "progress": {
+        "percent": 57,
+        "status": "on_track",
+        "summary": "研发驾驶舱与配置改造已落地初版"
+      },
+      "today": [
+        "落地角色看板",
+        "联通 cron 数据",
+        "验证网关与渠道状态"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "growth",
+      "name": "增长运营",
+      "owner": "role-growth",
+      "daily_routine": [
+        "12:00 内容发布",
+        "18:30 线索复盘",
+        "21:30 转化跟进"
+      ],
+      "focus": "线索增长、完课率提升、转化追踪",
+      "progress": {
+        "percent": 33,
+        "status": "watch",
+        "summary": "节奏已设定，数据归因与复盘模板待完善"
+      },
+      "today": [
+        "更新内容选题池",
+        "复盘昨日线索转化",
+        "输出明日投放动作"
+      ],
+      "blockers": [
+        "缺少统一的渠道归因视图"
+      ]
+    },
+    {
+      "id": "code_reviewer",
+      "name": "代码 Reviewer",
+      "owner": "role-code-reviewer",
+      "daily_routine": [
+        "11:30 代码审查",
+        "16:00 风险复核",
+        "21:30 发布前审查"
+      ],
+      "focus": "代码质量、架构一致性、安全与可维护性",
+      "progress": {
+        "percent": 30,
+        "status": "watch",
+        "summary": "审查机制已接入，等待更多PR节奏"
+      },
+      "today": [
+        "建立审查清单模板",
+        "给核心模块做首轮Review",
+        "输出阻塞与改进建议"
+      ],
+      "blockers": [
+        "缺少统一PR模板与风险分级标准"
+      ]
+    },
+    {
+      "id": "qa_test",
+      "name": "测试工程师",
+      "owner": "role-qa-test",
+      "daily_routine": [
+        "10:30 测试计划",
+        "17:30 回归执行",
+        "22:00 发布准入评估"
+      ],
+      "focus": "回归测试、缺陷跟踪、发布准入结论",
+      "progress": {
+        "percent": 28,
+        "status": "watch",
+        "summary": "自动化覆盖在建设中，回归路径已定义"
+      },
+      "today": [
+        "补齐核心API回归用例",
+        "验证学习主流程E2E链路",
+        "输出发布go/no-go结论"
+      ],
+      "blockers": [
+        "缺少稳定的端到端自动化环境"
+      ]
+    }
+  ],
+  "milestones": [
+    {
+      "name": "学习路径 MVP 上线",
+      "deadline": "2026-04-15",
+      "status": "in_progress",
+      "owner": "产品+研发",
+      "progress": 40,
+      "linkedRoles": [
+        "product",
+        "tech_director",
+        "senior_dev",
+        "code_reviewer",
+        "qa_test"
+      ]
+    },
+    {
+      "name": "第 1 期学员闭环",
+      "deadline": "2026-05-10",
+      "status": "planned",
+      "owner": "增长+教研",
+      "progress": 20,
+      "linkedRoles": [
+        "director",
+        "product",
+        "growth",
+        "qa_test"
+      ]
+    },
+    {
+      "name": "自动化运营体系",
+      "deadline": "2026-05-31",
+      "status": "planned",
+      "owner": "总监+技术",
+      "progress": 15,
+      "linkedRoles": [
+        "director",
+        "tech_director",
+        "growth",
+        "code_reviewer",
+        "qa_test"
+      ]
+    }
+  ]
+}

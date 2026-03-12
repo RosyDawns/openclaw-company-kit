@@ -1,0 +1,15 @@
+{
+  "companyName": "__COMPANY_NAME__",
+  "projectPath": "__PROJECT_PATH__",
+  "projectRepo": "__PROJECT_REPO__",
+  "linkedAgents": [
+    "rd-company",
+    "role-product",
+    "role-tech-director",
+    "role-senior-dev",
+    "role-code-reviewer",
+    "role-qa-test",
+    "role-growth"
+  ],
+  "updatedAt": "__UPDATED_AT__"
+}

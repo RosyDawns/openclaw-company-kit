@@ -1,0 +1,15 @@
+{
+  "isReal": false,
+  "period": "last7d",
+  "source": "demo",
+  "currency": "CNY",
+  "revenue": 9600,
+  "spend": 4200,
+  "newLeads": 145,
+  "paidUsers": 19,
+  "conversionRate": 0.131,
+  "cac": 53,
+  "arpu": 505,
+  "refundRate": 0.018,
+  "cashInDays": 12
+}

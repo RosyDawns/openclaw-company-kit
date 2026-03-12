@@ -1,0 +1,18 @@
+.env
+.env.local
+*.log
+*.pid
+.tmp/
+.dist/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime cache
+data/
+dashboard/rd-dashboard/dashboard-data.json

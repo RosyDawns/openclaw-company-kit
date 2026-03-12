@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: JSON validation
+        run: |
+          jq -e . templates/jobs.template.json >/dev/null
+          jq -e . templates/company-project.template.json >/dev/null
+          jq -e . docker/demo_data/dashboard-data.json >/dev/null
+          jq -e . docker/demo_data/business-metrics.json >/dev/null
+
+      - name: Shell syntax check
+        run: |
+          bash -n scripts/_common.sh
+          bash -n scripts/install.sh
+          bash -n scripts/install-cron.sh
+          bash -n scripts/start.sh
+          bash -n scripts/stop.sh
+          bash -n scripts/healthcheck.sh
+          bash -n scripts/demo-up.sh
+          bash -n scripts/demo-down.sh
+          bash -n scripts/release-check.sh
+          bash -n docker/entrypoint.sh
+
+      - name: Python syntax check
+        run: |
+          python3 -m py_compile dashboard/rd-dashboard/dashboard_data.py
+
+      - name: Unit tests
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py' -v

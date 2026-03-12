@@ -1,0 +1,404 @@
+{
+  "generatedAt": "2026-03-12 10:30:00",
+  "timezone": "Asia/Shanghai",
+  "group": {
+    "id": "oc_demo_group_id",
+    "routeAgent": "rd-company",
+    "bindingFound": true
+  },
+  "overview": {
+    "enabledJobs": 10,
+    "errorJobs": 0,
+    "warnJobs": 0,
+    "allGroupJobs": 10,
+    "allJobs": 13
+  },
+  "project": {
+    "path": "/workspace/demo-project",
+    "linked": true,
+    "repoSlug": "demo-org/demo-ai-agent-platform",
+    "repoUrl": "https://github.com/demo-org/demo-ai-agent-platform",
+    "branch": "main",
+    "dirty": false,
+    "lastCommit": "a1b2c3d"
+  },
+  "association": {
+    "companyName": "Demo AI Company",
+    "projectPath": "/workspace/demo-project",
+    "projectRepo": "demo-org/demo-ai-agent-platform",
+    "linkedAgents": [
+      "rd-company",
+      "role-product",
+      "role-tech-director",
+      "role-senior-dev",
+      "role-code-reviewer",
+      "role-qa-test",
+      "role-growth"
+    ],
+    "updatedAt": "2026-03-12 10:20:00"
+  },
+  "githubAuth": {
+    "ok": true,
+    "account": "demo-org",
+    "message": "Demo data"
+  },
+  "github": {
+    "repo": "demo-org/demo-ai-agent-platform",
+    "ok": true,
+    "issueStats": {
+      "total": 18,
+      "open": 7,
+      "closed": 11,
+      "todo": 2,
+      "doing": 3,
+      "blocked": 1,
+      "done": 12,
+      "overdue": 0
+    },
+    "issues": [
+      {
+        "number": 101,
+        "title": "Refactor dashboard role tabs",
+        "state": "open",
+        "status": "doing",
+        "priority": "priority:p1",
+        "owners": [
+          "owner:role-senior-dev"
+        ],
+        "updatedAt": "2026-03-12 10:10:00",
+        "url": "https://github.com/demo-org/demo-ai-agent-platform/issues/101"
+      },
+      {
+        "number": 102,
+        "title": "Stabilize issue-sync retries",
+        "state": "open",
+        "status": "blocked",
+        "priority": "priority:p0",
+        "owners": [
+          "owner:role-tech-director"
+        ],
+        "updatedAt": "2026-03-12 10:12:00",
+        "url": "https://github.com/demo-org/demo-ai-agent-platform/issues/102"
+      }
+    ],
+    "timeline": {
+      "ok": true,
+      "prCount": 6,
+      "commitCount": 24
+    }
+  },
+  "company": {
+    "name": "Demo AI Company",
+    "projectLinked": true,
+    "linkedProjectPath": "/workspace/demo-project",
+    "linkedRepo": "demo-org/demo-ai-agent-platform",
+    "stats": {
+      "totalAgents": 7,
+      "activeAgents": 6,
+      "blockedAgents": 1,
+      "avgProgress": 68
+    }
+  },
+  "agentPanel": [
+    {
+      "id": "rd-company",
+      "name": "总监",
+      "agentName": "公司研发中台",
+      "owner": "rd-company",
+      "workspace": "/workspace/agents/rd-company",
+      "focus": "聚焦本周里程碑收敛",
+      "progress": {
+        "percent": 80,
+        "status": "on_track",
+        "summary": "Milestone A 进行中，交付节奏正常"
+      },
+      "today": [
+        "统一优先级策略",
+        "推进阻塞决策",
+        "晚间复盘输出"
+      ],
+      "blockers": [],
+      "dailyRoutine": [
+        "09:30 晨会",
+        "13:30 同步",
+        "20:30 复盘"
+      ],
+      "health": "healthy",
+      "activityLevel": "online",
+      "lastActive": "2026-03-12 10:28:00",
+      "lastActiveMs": 1773282480000,
+      "sessions": 12
+    },
+    {
+      "id": "role-product",
+      "name": "产品经理",
+      "agentName": "产品经理",
+      "owner": "role-product",
+      "workspace": "/workspace/agents/role-product",
+      "focus": "课程路径与验收标准",
+      "progress": {
+        "percent": 65,
+        "status": "doing",
+        "summary": "需求拆解进行中"
+      },
+      "today": [
+        "补齐任务验收标准",
+        "梳理 FAQ",
+        "同步体验问题"
+      ],
+      "blockers": [],
+      "dailyRoutine": [
+        "10:00 需求梳理",
+        "15:00 体验检查"
+      ],
+      "health": "healthy",
+      "activityLevel": "online",
+      "lastActive": "2026-03-12 10:21:00",
+      "lastActiveMs": 1773282060000,
+      "sessions": 21
+    },
+    {
+      "id": "role-tech-director",
+      "name": "技术总监",
+      "agentName": "技术总监",
+      "owner": "role-tech-director",
+      "workspace": "/workspace/agents/role-tech-director",
+      "focus": "编排稳定性",
+      "progress": {
+        "percent": 55,
+        "status": "blocked",
+        "summary": "Issue #102 阻塞待决策"
+      },
+      "today": [
+        "优化重试策略",
+        "修复 cron 失败回补"
+      ],
+      "blockers": [
+        "#102 需要总监确认重试上限"
+      ],
+      "dailyRoutine": [
+        "10:30 架构巡检",
+        "16:30 风险评估"
+      ],
+      "health": "blocked",
+      "activityLevel": "recent",
+      "lastActive": "2026-03-12 10:19:00",
+      "lastActiveMs": 1773281940000,
+      "sessions": 18
+    },
+    {
+      "id": "role-senior-dev",
+      "name": "高级程序员",
+      "agentName": "高级程序员",
+      "owner": "role-senior-dev",
+      "workspace": "/workspace/agents/role-senior-dev",
+      "focus": "功能开发与提交证据",
+      "progress": {
+        "percent": 72,
+        "status": "doing",
+        "summary": "Issue #101 已有 PR 证据"
+      },
+      "today": [
+        "完成角色视角优化",
+        "补充单测"
+      ],
+      "blockers": [],
+      "dailyRoutine": [
+        "11:00 开发",
+        "17:00 测试",
+        "22:00 提交"
+      ],
+      "health": "healthy",
+      "activityLevel": "online",
+      "lastActive": "2026-03-12 10:24:00",
+      "lastActiveMs": 1773282240000,
+      "sessions": 26
+    },
+    {
+      "id": "role-code-reviewer",
+      "name": "代码 Reviewer",
+      "agentName": "代码 Reviewer",
+      "owner": "role-code-reviewer",
+      "workspace": "/workspace/agents/role-code-reviewer",
+      "focus": "风险审查",
+      "progress": {
+        "percent": 62,
+        "status": "watch",
+        "summary": "待审 PR 2 个"
+      },
+      "today": [
+        "审查高优先级 PR",
+        "输出风险清单"
+      ],
+      "blockers": [],
+      "dailyRoutine": [
+        "11:30 代码审查",
+        "21:30 发布前审查"
+      ],
+      "health": "watch",
+      "activityLevel": "recent",
+      "lastActive": "2026-03-12 10:16:00",
+      "lastActiveMs": 1773281760000,
+      "sessions": 17
+    },
+    {
+      "id": "role-qa-test",
+      "name": "测试工程师",
+      "agentName": "测试工程师",
+      "owner": "role-qa-test",
+      "workspace": "/workspace/agents/role-qa-test",
+      "focus": "回归测试",
+      "progress": {
+        "percent": 58,
+        "status": "doing",
+        "summary": "核心流程回归中"
+      },
+      "today": [
+        "执行 smoke 回归",
+        "输出 go/no-go 结论"
+      ],
+      "blockers": [],
+      "dailyRoutine": [
+        "10:30 测试计划",
+        "17:30 回归"
+      ],
+      "health": "healthy",
+      "activityLevel": "online",
+      "lastActive": "2026-03-12 10:22:00",
+      "lastActiveMs": 1773282120000,
+      "sessions": 15
+    },
+    {
+      "id": "role-growth",
+      "name": "增长运营",
+      "agentName": "增长运营",
+      "owner": "role-growth",
+      "workspace": "/workspace/agents/role-growth",
+      "focus": "转化与归因",
+      "progress": {
+        "percent": 40,
+        "status": "watch",
+        "summary": "渠道归因视图待补齐"
+      },
+      "today": [
+        "更新投放素材",
+        "复盘昨日线索"
+      ],
+      "blockers": [
+        "缺少统一归因看板"
+      ],
+      "dailyRoutine": [
+        "12:00 内容发布",
+        "18:30 线索复盘"
+      ],
+      "health": "watch",
+      "activityLevel": "idle",
+      "lastActive": "2026-03-12 09:42:00",
+      "lastActiveMs": 1773280920000,
+      "sessions": 6
+    }
+  ],
+  "blockersBoard": [
+    {
+      "title": "#102 Stabilize issue-sync retries",
+      "owner": "role-tech-director",
+      "status": "blocked",
+      "due": "2026-03-13",
+      "source": "github"
+    }
+  ],
+  "risksBoard": [
+    {
+      "title": "QA automation coverage below target",
+      "level": "medium",
+      "owner": "role-qa-test"
+    }
+  ],
+  "roles": [],
+  "milestones": [
+    {
+      "title": "MVP Sprint W12",
+      "open": 4,
+      "closed": 8,
+      "progress": 67,
+      "due": "2026-03-17"
+    }
+  ],
+  "activityFeed": [
+    {
+      "time": "2026-03-12 10:28:00",
+      "type": "agent",
+      "level": "ok",
+      "title": "总监 最近活跃",
+      "detail": "推进里程碑决策"
+    },
+    {
+      "time": "2026-03-12 10:24:00",
+      "type": "issue",
+      "level": "warn",
+      "title": "Issue #102 · blocked",
+      "detail": "Stabilize issue-sync retries"
+    }
+  ],
+  "deltas": {
+    "issues": {
+      "summary": {
+        "newOpen": 1,
+        "closed": 0,
+        "statusChanged": 2
+      }
+    }
+  },
+  "businessRadar": {
+    "updatedAt": "2026-03-12 10:10:00",
+    "summary": "Demo radar brief"
+  },
+  "businessMetrics": {
+    "isReal": false,
+    "period": "last7d",
+    "source": "demo",
+    "revenue": 9600,
+    "newLeads": 145,
+    "paidUsers": 19,
+    "conversionRate": 0.131,
+    "cac": 53,
+    "arpu": 505
+  },
+  "freshness": {
+    "config": "2026-03-12 10:20:00",
+    "cron": "2026-03-12 10:20:00",
+    "teamStatus": "2026-03-12 10:20:00",
+    "association": "2026-03-12 10:20:00",
+    "businessMetrics": "2026-03-12 10:20:00"
+  },
+  "cronJobs": [
+    {
+      "name": "角色进度同步-产品经理",
+      "agentId": "role-product",
+      "enabled": true,
+      "schedule": "2,32 8-22 * * 1-5",
+      "lastRunStatus": "ok",
+      "lastDeliveryStatus": "delivered",
+      "kind": "openclaw-cron"
+    },
+    {
+      "name": "代码执行-高级程序员",
+      "agentId": "role-senior-dev",
+      "enabled": true,
+      "schedule": "*/30 8-22 * * 1-5",
+      "lastRunStatus": "ok",
+      "lastDeliveryStatus": "delivered",
+      "kind": "openclaw-cron"
+    }
+  ],
+  "dataSources": {
+    "agentPanel": "demo",
+    "blockers": "demo",
+    "milestones": "demo",
+    "cronJobs": "demo",
+    "activityFeed": "demo",
+    "issueDeltas": "demo",
+    "businessRadar": "demo",
+    "businessMetrics": "demo"
+  }
+}
