@@ -245,9 +245,9 @@ def preflight_check(config: dict[str, str]) -> dict:
     oc_ok = oc_config_path.exists()
     if not oc_ok and source_path:
         oc_ok = Path(source_path).expanduser().exists()
-    checks.append({"name": "openclaw_config", "ok": oc_ok, "type": "config"})
+    checks.append({"name": "openclaw_config", "ok": oc_ok, "type": "config", "blocking": False})
 
-    all_passed = all(c["ok"] for c in checks)
+    all_passed = all(c["ok"] for c in checks if c.get("blocking", True))
     return {"ok": True, "checks": checks, "allPassed": all_passed}
 
 

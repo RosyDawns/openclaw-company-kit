@@ -545,9 +545,11 @@
             if (!el) return;
             const checks = pf.checks || [];
             const lines = checks.map(c => {
-              const icon = c.ok ? '<span style="color:var(--ok)">✓</span>' : '<span style="color:var(--err)">✗</span>';
+              const isWarn = !c.ok && c.blocking === false;
+              const icon = c.ok ? '<span style="color:var(--ok)">✓</span>' : isWarn ? '<span style="color:var(--warn)">⚠</span>' : '<span style="color:var(--err)">✗</span>';
               const ver = c.version ? ` (${esc(c.version)})` : '';
-              return `${icon} ${esc(c.name)}${ver}`;
+              const hint = isWarn ? ' (初始化时自动创建)' : '';
+              return `${icon} ${esc(c.name)}${ver}${hint}`;
             });
             el.innerHTML = lines.join(' &nbsp; ');
           }).catch(() => {
