@@ -18,6 +18,7 @@
 - `scripts/`: install/start/stop/healthcheck/release-check
 - `templates/`: 配置模板（cron、群提示词、公司关联）
 - `dashboard/rd-dashboard/`: 驾驶舱与同步脚本
+- `web/setup.html`: 分步配置中心页面
 - `docker/`: demo 数据 + 容器入口
 - `docs/`: 使用与架构文档
 - `examples/`: 流程示例
@@ -25,22 +26,18 @@
 
 ## Quick Start (Native)
 
-### One-command bootstrap (recommended on new computer)
+### One-command launch (recommended on new computer)
 
 ```bash
-bash scripts/bootstrap.sh
+bash scripts/launch.sh
 ```
 
-This wizard will:
-- initialize an OpenClaw profile
-- ask for model provider + API key
-- supports domestic providers (Moonshot/ZAI/MiniMax/Qianfan/Volcengine/BytePlus/Xiaomi/DeepSeek/Qwen)
-- supports self-hosted custom models (OpenAI-compatible / Anthropic-compatible)
-- ask for Feishu app/group settings
-- auto-detect current local Feishu defaults (if existing config is present)
-- keep 7-role mapping with 2 Feishu apps by default: `hot-search` (group router) + `ai-tech` (intel)
-- generate `.env`
-- run install + start automatically
+New flow:
+- terminal only asks one port
+- opens a web setup page: `http://127.0.0.1:<port>/setup`
+- step-by-step configure model/provider, project, Feishu, GitHub token
+- click once to apply and auto-run `stop -> install -> start`
+- dashboard can jump back to setup center (`配置中心`) to edit config and restart
 
 ### Manual mode
 
@@ -69,6 +66,11 @@ bash scripts/start.sh
 5. Verify
 ```bash
 bash scripts/healthcheck.sh
+```
+
+Optional legacy CLI wizard (advanced):
+```bash
+bash scripts/bootstrap.sh
 ```
 
 Dashboard default:

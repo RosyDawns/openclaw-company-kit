@@ -8,6 +8,7 @@ bash -n scripts/_common.sh
 bash -n scripts/install.sh
 bash -n scripts/install-cron.sh
 bash -n scripts/bootstrap.sh
+bash -n scripts/launch.sh
 bash -n scripts/start.sh
 bash -n scripts/stop.sh
 bash -n scripts/healthcheck.sh
@@ -25,6 +26,7 @@ jq -e . docker/demo_data/dashboard-data.json >/dev/null
 jq -e . docker/demo_data/business-metrics.json >/dev/null
 
 python3 -m py_compile dashboard/rd-dashboard/dashboard_data.py
+python3 -m py_compile scripts/control_server.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 echo "[OK] release checks passed"

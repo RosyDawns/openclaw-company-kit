@@ -3,10 +3,18 @@
 ## Option A: Native Host (recommended)
 
 ```bash
+bash scripts/launch.sh
+```
+
+Then open setup page and apply config from browser.
+
+or manual legacy flow:
+
+```bash
 bash scripts/bootstrap.sh
 ```
 
-or manual:
+or fully manual:
 
 ```bash
 bash scripts/install.sh

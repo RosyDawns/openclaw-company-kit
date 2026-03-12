@@ -6,21 +6,23 @@
 - `jq`, `python3`, `rsync`
 - A Feishu app + group ID
 
-## 2) One-command bootstrap (recommended)
+## 2) One-command launch (recommended)
 
+```bash
+bash scripts/launch.sh
+```
+
+Flow:
+- CLI asks only one port
+- open browser setup page (`/setup`)
+- complete step-by-step config
+- click apply to run `stop -> install -> start`
+- enter dashboard (`/dashboard/`) and reuse setup center for reconfiguration/restart
+
+Legacy CLI wizard (optional):
 ```bash
 bash scripts/bootstrap.sh
 ```
-
-Wizard actions:
-- choose model provider
-- includes domestic providers and custom self-hosted model options
-- input API key
-- input Feishu config
-- auto-detect existing local Feishu defaults (if available)
-- apply 7-role setup with 2 Feishu accounts by default (`hot-search` + `ai-tech`)
-- auto-generate `.env`
-- run install/start
 
 ## 3) Manual setup (optional)
 

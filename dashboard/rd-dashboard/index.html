@@ -134,6 +134,9 @@
         border: 1px solid rgba(255, 255, 255, 0.35);
         background: rgba(255, 255, 255, 0.14);
         color: var(--text);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
         border-radius: 10px;
         padding: 8px 12px;
         cursor: pointer;
@@ -456,6 +459,7 @@
             <label class="switch"><input id="autoRefresh" type="checkbox" checked />自动刷新</label>
             <span>下次刷新：<b id="refreshTick">--</b></span>
             <button id="refreshBtn" class="btn">立即刷新</button>
+            <a class="btn" href="/setup?from=dashboard">配置中心</a>
           </div>
         </div>
         <nav id="navTabs" class="tabs"></nav>
