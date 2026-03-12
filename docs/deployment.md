@@ -1,5 +1,19 @@
 # Deployment
 
+## 一键安装流程所涵盖的项
+
+配置中心点击「初始化并启动」或「应用并重启」时，脚本会自动处理：
+
+| 项 | 说明 | 脚本位置 |
+|----|------|----------|
+| 源配置路径 | 未设置 `SOURCE_OPENCLAW_CONFIG` 时，使用当前 profile 目录下的 `openclaw.json`（如 `~/.openclaw-zhiyun/openclaw.json`） | `install.sh` |
+| 配置 schema | 写入与当前 OpenClaw CLI 兼容的 config（如 compaction 结构、校验方式） | `install.sh` |
+| 网关安装与启动 | 启动前先执行 `gateway install`（安装 LaunchAgent），再 `gateway start`，减少 healthcheck 因网关未装而失败 | `start.sh` |
+
+若 healthcheck 仍报网关不可达，请按 [Troubleshooting](troubleshooting.md#install-fails-with-gateway-connect-error) 手动执行 `gateway install` / `gateway start` 或 `doctor`。
+
+---
+
 ## Option A: Native Host (recommended)
 
 ```bash

@@ -288,13 +288,13 @@
       ];
 
       const modelPresets = {
-        keep: "",
-        deepseek: "deepseek/deepseek-chat",
-        qwen: "qwen/qwen-plus",
-        moonshot: "moonshot/moonshot-v1-32k",
-        zai: "zai/glm-4-flash",
-        minimax: "minimax/minimax-m1",
-        custom: "",
+        keep: null,
+        deepseek: { provider_id: "deepseek", model_id: "deepseek-chat", base_url: "https://api.deepseek.com/v1", compatibility: "openai" },
+        qwen: { provider_id: "qwen", model_id: "qwen-max", base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1", compatibility: "openai" },
+        moonshot: { provider_id: "moonshot", model_id: "moonshot-v1-128k", base_url: "https://api.moonshot.cn/v1", compatibility: "openai" },
+        zai: { provider_id: "zai", model_id: "zai-r1", base_url: "https://open.bigmodel.cn/api/paas/v4", compatibility: "openai" },
+        minimax: { provider_id: "minimax", model_id: "MiniMax-Text-01", base_url: "https://api.minimax.chat/v1", compatibility: "openai" },
+        custom: { provider_id: "", model_id: "", base_url: "", compatibility: "openai" },
       };
 
       const state = {
@@ -367,11 +367,24 @@
           "GH_TOKEN",
           "MODEL_PRIMARY",
           "DASHBOARD_PORT",
+          "CUSTOM_BASE_URL",
+          "CUSTOM_API_KEY",
+          "CUSTOM_MODEL_ID",
+          "CUSTOM_PROVIDER_ID",
+          "CUSTOM_COMPATIBILITY",
         ];
         ids.forEach((k) => {
           const v = byId(k);
           if (v) cfg[k] = String(v.value || "").trim();
         });
+
+        const preset = getVal("MODEL_PRESET");
+        if (preset !== "keep") {
+          const pid = cfg.CUSTOM_PROVIDER_ID || "";
+          const mid = cfg.CUSTOM_MODEL_ID || "";
+          if (pid && mid) cfg.MODEL_PRIMARY = `${pid}/${mid}`;
+        }
+
         return cfg;
       }
 
@@ -453,9 +466,38 @@
                   </select>
                 </div>
                 <div class="field">
-                  <label>MODEL_PRIMARY</label>
-                  <input id="MODEL_PRIMARY" value="${esc(c.MODEL_PRIMARY || "")}" placeholder="如 deepseek/deepseek-chat" />
+                  <label>MODEL_PRIMARY（自动生成）</label>
+                  <input id="MODEL_PRIMARY" value="${esc(c.MODEL_PRIMARY || "")}" placeholder="如 deepseek/deepseek-chat" readonly />
                 </div>
+              </div>
+              <div id="customProviderFields" style="display:none; margin-top:10px;">
+                <div class="grid">
+                  <div class="field">
+                    <label>API Base URL</label>
+                    <input id="CUSTOM_BASE_URL" type="text" value="${esc(c.CUSTOM_BASE_URL || "")}" placeholder="https://api.example.com/v1" />
+                  </div>
+                  <div class="field">
+                    <label>API Key</label>
+                    <input id="CUSTOM_API_KEY" type="password" value="${esc(c.CUSTOM_API_KEY || "")}" placeholder="sk-..." />
+                  </div>
+                  <div class="field">
+                    <label>模型 ID</label>
+                    <input id="CUSTOM_MODEL_ID" type="text" value="${esc(c.CUSTOM_MODEL_ID || "")}" placeholder="model-name" />
+                  </div>
+                  <div class="field">
+                    <label>Provider ID</label>
+                    <input id="CUSTOM_PROVIDER_ID" type="text" value="${esc(c.CUSTOM_PROVIDER_ID || "")}" placeholder="my-provider" />
+                  </div>
+                  <div class="field">
+                    <label>兼容模式</label>
+                    <select id="CUSTOM_COMPATIBILITY">
+                      <option value="openai">openai</option>
+                      <option value="anthropic">anthropic</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="grid" style="margin-top:10px;">
                 <div class="field" style="grid-column:1 / -1;">
                   <label>GH_TOKEN (可选，GitHub Issue 同步建议配置)</label>
                   <input id="GH_TOKEN" type="password" value="${esc(c.GH_TOKEN || "")}" />
@@ -529,12 +571,75 @@
         byId("panel").innerHTML = panes[key] || "";
 
         if (key === "step-model") {
-          const current = String(c.MODEL_PRIMARY || "").trim();
-          const preset = Object.entries(modelPresets).find(([, v]) => v === current)?.[0] || (current ? "custom" : "keep");
-          fillValue("MODEL_PRESET", preset);
+          const customFields = byId("customProviderFields");
+          const primaryEl = byId("MODEL_PRIMARY");
+
+          function applyPreset(p) {
+            const data = modelPresets[p];
+            if (p === "keep") {
+              customFields.style.display = "none";
+              primaryEl.readOnly = false;
+              return;
+            }
+            customFields.style.display = "";
+            primaryEl.readOnly = true;
+            const isCustom = p === "custom";
+            const fields = ["CUSTOM_BASE_URL", "CUSTOM_MODEL_ID", "CUSTOM_PROVIDER_ID"];
+            if (isCustom) {
+              fields.forEach(f => { const el = byId(f); if (el) { el.value = ""; el.readOnly = false; } });
+              const compEl = byId("CUSTOM_COMPATIBILITY");
+              if (compEl) { compEl.value = "openai"; compEl.disabled = false; }
+              const keyEl = byId("CUSTOM_API_KEY");
+              if (keyEl) { keyEl.value = ""; keyEl.readOnly = false; }
+              fillValue("MODEL_PRIMARY", "");
+            } else if (data) {
+              fillValue("CUSTOM_BASE_URL", data.base_url);
+              fillValue("CUSTOM_MODEL_ID", data.model_id);
+              fillValue("CUSTOM_PROVIDER_ID", data.provider_id);
+              fillValue("CUSTOM_COMPATIBILITY", data.compatibility);
+              fields.forEach(f => { const el = byId(f); if (el) el.readOnly = true; });
+              const compEl = byId("CUSTOM_COMPATIBILITY");
+              if (compEl) compEl.disabled = true;
+              const keyEl = byId("CUSTOM_API_KEY");
+              if (keyEl) keyEl.readOnly = false;
+              fillValue("MODEL_PRIMARY", `${data.provider_id}/${data.model_id}`);
+            }
+          }
+
+          const savedUrl = String(c.CUSTOM_BASE_URL || "").trim();
+          if (savedUrl) {
+            const matched = Object.entries(modelPresets).find(([k, v]) =>
+              k !== "keep" && k !== "custom" && v &&
+              v.base_url === savedUrl &&
+              v.model_id === String(c.CUSTOM_MODEL_ID || "").trim() &&
+              v.provider_id === String(c.CUSTOM_PROVIDER_ID || "").trim()
+            );
+            const presetKey = matched ? matched[0] : "custom";
+            fillValue("MODEL_PRESET", presetKey);
+            applyPreset(presetKey);
+            if (presetKey === "custom") {
+              fillValue("CUSTOM_BASE_URL", c.CUSTOM_BASE_URL || "");
+              fillValue("CUSTOM_MODEL_ID", c.CUSTOM_MODEL_ID || "");
+              fillValue("CUSTOM_PROVIDER_ID", c.CUSTOM_PROVIDER_ID || "");
+              fillValue("CUSTOM_COMPATIBILITY", c.CUSTOM_COMPATIBILITY || "openai");
+              fillValue("CUSTOM_API_KEY", c.CUSTOM_API_KEY || "");
+            } else {
+              fillValue("CUSTOM_API_KEY", c.CUSTOM_API_KEY || "");
+            }
+          } else {
+            const current = String(c.MODEL_PRIMARY || "").trim();
+            if (current) {
+              fillValue("MODEL_PRESET", "custom");
+              applyPreset("custom");
+              fillValue("MODEL_PRIMARY", current);
+            } else {
+              fillValue("MODEL_PRESET", "keep");
+              applyPreset("keep");
+            }
+          }
+
           byId("MODEL_PRESET").addEventListener("change", () => {
-            const p = getVal("MODEL_PRESET");
-            if (p !== "custom") fillValue("MODEL_PRIMARY", modelPresets[p] || "");
+            applyPreset(getVal("MODEL_PRESET"));
           });
         }
 

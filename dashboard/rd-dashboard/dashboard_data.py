@@ -1074,7 +1074,7 @@ def build_owner_timeline_evidence(github_tracker: dict, issue_deltas: dict, gith
             else:
                 touch(rec, "commit", None, ts_ms)
 
-        company_rec = evidence.get("rd-company") or new_evidence()
+    company_rec = evidence.get("rd-company") or new_evidence()
     for aid in COMPANY_AGENT_IDS:
         if aid == "rd-company":
             continue

@@ -20,6 +20,8 @@ fi
 if [ -z "${SOURCE_CONFIG_PATH:-}" ] || [ ! -f "${SOURCE_CONFIG_PATH:-}" ]; then
   if [ -n "${PROFILE_CONFIG_PATH}" ] && [ -f "${PROFILE_CONFIG_PATH}" ]; then
     SOURCE_CONFIG_PATH="${PROFILE_CONFIG_PATH}"
+  elif [ -f "${PROFILE_DIR}/openclaw.json" ]; then
+    SOURCE_CONFIG_PATH="${PROFILE_DIR}/openclaw.json"
   else
     SOURCE_CONFIG_PATH="$(expand_tilde_path "$(openclaw config file 2>/dev/null || true)")"
   fi
@@ -80,7 +82,7 @@ jq \
   '
   .agents.defaults.workspace = ($stateDir + "/workspace") |
   .agents.defaults.heartbeat = {"every": "30m", "target": "last", "activeHours": {"start": "08:00", "end": "22:00"}} |
-  .agents.defaults.compaction = {"enabled": true, "memoryFlush": {"enabled": true}} |
+  .agents.defaults.compaction = {"mode": "safeguard"} |
   (if $modelPrimary != "" then .agents.defaults.model.primary = $modelPrimary else . end) |
   .agents.list = [
     {"id":"main","default":true,"name":"主助手","workspace":($stateDir + "/workspace")},
@@ -175,7 +177,7 @@ RUNTIME_ENV
 
 chmod +x "${TARGET_DASHBOARD_DIR}/"*.sh
 
-ocp config validate >/dev/null
+ocp config get agents --json >/dev/null
 
 if ! "${ROOT_DIR}/scripts/install-cron.sh"; then
   echo "[WARN] cron sync failed (gateway unreachable or auth mismatch)." >&2
