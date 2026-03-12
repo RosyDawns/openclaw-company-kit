@@ -10,17 +10,27 @@ required_var GROUP_ID
 required_var FEISHU_HOT_APP_ID
 required_var FEISHU_HOT_APP_SECRET
 
-SOURCE_CONFIG_PATH="${SOURCE_OPENCLAW_CONFIG:-$(openclaw config file)}"
-SOURCE_CONFIG_PATH="$(expand_tilde_path "${SOURCE_CONFIG_PATH}")"
+PROFILE_CONFIG_PATH="$(ocp config file 2>/dev/null || true)"
+PROFILE_CONFIG_PATH="$(expand_tilde_path "${PROFILE_CONFIG_PATH:-}")"
+
+if [ -n "${SOURCE_OPENCLAW_CONFIG:-}" ]; then
+  SOURCE_CONFIG_PATH="$(expand_tilde_path "${SOURCE_OPENCLAW_CONFIG}")"
+elif [ -n "${PROFILE_CONFIG_PATH}" ] && [ -f "${PROFILE_CONFIG_PATH}" ]; then
+  SOURCE_CONFIG_PATH="${PROFILE_CONFIG_PATH}"
+else
+  SOURCE_CONFIG_PATH="$(expand_tilde_path "$(openclaw config file)")"
+fi
 
 if [ ! -f "${SOURCE_CONFIG_PATH}" ]; then
   echo "[ERROR] source OpenClaw config not found: ${SOURCE_CONFIG_PATH}" >&2
-  echo "Please run openclaw configure first, or set SOURCE_OPENCLAW_CONFIG in .env" >&2
+  echo "Please run openclaw configure/onboard first, or set SOURCE_OPENCLAW_CONFIG in .env" >&2
   exit 1
 fi
 
 mkdir -p "${PROFILE_DIR}" "${TARGET_WORKSPACE}" "${TARGET_AGENTS_DIR}" "${TARGET_DASHBOARD_DIR}"
-cp "${SOURCE_CONFIG_PATH}" "${PROFILE_DIR}/openclaw.json"
+if [ "${SOURCE_CONFIG_PATH}" != "${PROFILE_DIR}/openclaw.json" ]; then
+  cp "${SOURCE_CONFIG_PATH}" "${PROFILE_DIR}/openclaw.json"
+fi
 
 echo "[install] profile=${OPENCLAW_PROFILE}"
 echo "[install] config=${PROFILE_DIR}/openclaw.json"

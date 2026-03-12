@@ -2,11 +2,27 @@
 
 ## 1) Prerequisites
 
-- OpenClaw installed and configured
+- OpenClaw installed
 - `jq`, `python3`, `rsync`
 - A Feishu app + group ID
 
-## 2) Configure Environment
+## 2) One-command bootstrap (recommended)
+
+```bash
+bash scripts/bootstrap.sh
+```
+
+Wizard actions:
+- choose model provider
+- includes domestic providers and custom self-hosted model options
+- input API key
+- input Feishu config
+- auto-generate `.env`
+- run install/start
+
+## 3) Manual setup (optional)
+
+Configure Environment
 
 ```bash
 cp .env.example .env

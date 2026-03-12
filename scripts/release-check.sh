@@ -7,6 +7,7 @@ cd "${ROOT_DIR}"
 bash -n scripts/_common.sh
 bash -n scripts/install.sh
 bash -n scripts/install-cron.sh
+bash -n scripts/bootstrap.sh
 bash -n scripts/start.sh
 bash -n scripts/stop.sh
 bash -n scripts/healthcheck.sh

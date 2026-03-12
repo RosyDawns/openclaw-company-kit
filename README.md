@@ -25,6 +25,23 @@
 
 ## Quick Start (Native)
 
+### One-command bootstrap (recommended on new computer)
+
+```bash
+bash scripts/bootstrap.sh
+```
+
+This wizard will:
+- initialize an OpenClaw profile
+- ask for model provider + API key
+- supports domestic providers (Moonshot/ZAI/MiniMax/Qianfan/Volcengine/BytePlus/Xiaomi/DeepSeek/Qwen)
+- supports self-hosted custom models (OpenAI-compatible / Anthropic-compatible)
+- ask for Feishu app/group settings
+- generate `.env`
+- run install + start automatically
+
+### Manual mode
+
 1. Create env file
 ```bash
 cp .env.example .env

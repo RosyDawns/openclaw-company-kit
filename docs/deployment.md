@@ -3,6 +3,12 @@
 ## Option A: Native Host (recommended)
 
 ```bash
+bash scripts/bootstrap.sh
+```
+
+or manual:
+
+```bash
 bash scripts/install.sh
 bash scripts/start.sh
 ```
