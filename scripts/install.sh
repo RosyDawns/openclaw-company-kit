@@ -69,7 +69,7 @@ for agent_id in hot-search ai-tech rd-company role-product role-tech-director ro
       cp "${ROOT_DIR}/templates/agents/${agent_id}/${mdfile}" "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
     fi
     if [ -f "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}" ]; then
-      sed -i '' \
+      sed_inplace \
         -e "s|__PROJECT_PATH__|${PROJECT_PATH}|g" \
         -e "s|__PROJECT_REPO__|${PROJECT_REPO}|g" \
         -e "s|__COMPANY_NAME__|${COMPANY_NAME}|g" \
@@ -103,12 +103,17 @@ jq \
   --arg aiBotName "${FEISHU_AI_BOT_NAME}" \
   --arg ghToken "${GH_TOKEN}" \
   --arg modelPrimary "${MODEL_PRIMARY}" \
+  --arg modelSubagent "${MODEL_SUBAGENT}" \
+  --arg discordToken "${DISCORD_BOT_TOKEN}" \
+  --arg discordGuild "${DISCORD_GUILD_ID}" \
+  --arg discordChannel "${DISCORD_CHANNEL_ID}" \
   --arg prompt "${GROUP_PROMPT}" \
   '
   .agents.defaults.workspace = ($stateDir + "/workspace") |
   .agents.defaults.heartbeat = {"every": "30m", "target": "last", "activeHours": {"start": "08:00", "end": "22:00"}} |
   .agents.defaults.compaction = {"mode": "safeguard", "memoryFlush": {"enabled": true, "softThresholdTokens": 4000}} |
   (if $modelPrimary != "" then .agents.defaults.model.primary = $modelPrimary else . end) |
+  (if $modelSubagent != "" then .agents.defaults.subagents.model = $modelSubagent else . end) |
   .agents.list = [
     {"id":"main","default":true,"name":"主助手","workspace":($stateDir + "/workspace")},
     {"id":"hot-search","name":"热点推荐","workspace":($stateDir + "/agents/hot-search"),
@@ -204,7 +209,19 @@ jq \
   .session.agentToAgent = {"maxPingPongTurns": 3} |
   .skills = (.skills // {}) |
   .skills.entries = (.skills.entries // {}) |
-  (if $ghToken != "" then .skills.entries["gh-issues"] = {"apiKey": $ghToken} else . end)
+  (if $ghToken != "" then .skills.entries["gh-issues"] = {"apiKey": $ghToken} else . end) |
+  (if $discordToken != "" then
+    .channels.discord = (.channels.discord // {}) |
+    .channels.discord += {"enabled": true, "token": $discordToken, "dmPolicy": "open", "groupPolicy": "allowlist"} |
+    (if $discordGuild != "" then
+      .channels.discord.guilds = (.channels.discord.guilds // {}) |
+      (if $discordChannel != "" then
+        .channels.discord.guilds[$discordGuild] = {"channels": {($discordChannel): {"allow": true}}}
+      else
+        .channels.discord.guilds[$discordGuild] = {}
+      end)
+    else . end)
+  else . end)
   ' "${PROFILE_DIR}/openclaw.json" > "${tmp_cfg}"
 
 mv "${tmp_cfg}" "${PROFILE_DIR}/openclaw.json"

@@ -1,0 +1,27 @@
+# OpenClaw Company Kit — Caddy Reverse Proxy
+#
+# Usage:
+#   DOMAIN=openclaw.example.com caddy run --config deploy/Caddyfile
+#
+# Caddy auto-manages Let's Encrypt certificates.
+# For localhost/dev, it generates a self-signed cert automatically.
+
+{$DOMAIN:localhost} {
+	# OpenClaw Gateway API & WebSocket
+	handle /api/* {
+		reverse_proxy localhost:{$GATEWAY_PORT:3000}
+	}
+	handle /ws/* {
+		reverse_proxy localhost:{$GATEWAY_PORT:3000}
+	}
+
+	# Dashboard (catch-all)
+	handle {
+		reverse_proxy localhost:{$DASHBOARD_PORT:8788}
+	}
+
+	log {
+		output file /var/log/caddy/openclaw.log
+		format console
+	}
+}

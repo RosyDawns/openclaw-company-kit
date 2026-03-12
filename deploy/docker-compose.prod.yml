@@ -1,0 +1,53 @@
+services:
+  openclaw-gateway:
+    image: node:22-slim
+    restart: unless-stopped
+    env_file: ../.env
+    working_dir: /app
+    volumes:
+      - ..:/app:ro
+      - openclaw-data:/root/.openclaw-${OPENCLAW_PROFILE:-company}
+    command: >
+      sh -c "npm i -g @anthropics/openclaw &&
+             openclaw --profile ${OPENCLAW_PROFILE:-company} gateway start --foreground"
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  dashboard:
+    image: node:22-slim
+    restart: unless-stopped
+    env_file: ../.env
+    working_dir: /app
+    volumes:
+      - ..:/app:ro
+    command: npx wrangler pages dev dashboard --port 8788 --no-bundle
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-8788}:8788"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - GATEWAY_PORT=${GATEWAY_PORT:-3000}
+      - DASHBOARD_PORT=${DASHBOARD_PORT:-8788}
+    depends_on:
+      - openclaw-gateway
+      - dashboard
+
+volumes:
+  openclaw-data:
+  caddy-data:
+  caddy-config:

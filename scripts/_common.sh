@@ -37,6 +37,11 @@ load_env() {
   CUSTOM_PROVIDER_ID="${CUSTOM_PROVIDER_ID:-}"
   CUSTOM_COMPATIBILITY="${CUSTOM_COMPATIBILITY:-}"
 
+  MODEL_SUBAGENT="${MODEL_SUBAGENT:-}"
+  DISCORD_BOT_TOKEN="${DISCORD_BOT_TOKEN:-}"
+  DISCORD_GUILD_ID="${DISCORD_GUILD_ID:-}"
+  DISCORD_CHANNEL_ID="${DISCORD_CHANNEL_ID:-}"
+
   DASHBOARD_PORT="${DASHBOARD_PORT:-8788}"
 
   if [ "${OPENCLAW_PROFILE}" = "default" ] || [ "${OPENCLAW_PROFILE}" = "main" ]; then
@@ -76,6 +81,14 @@ check_cmds() {
 
 ocp() {
   openclaw "${OPENCLAW_ARGS[@]}" "$@"
+}
+
+sed_inplace() {
+  if sed --version 2>/dev/null | grep -q GNU; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
 }
 
 expand_tilde_path() {
