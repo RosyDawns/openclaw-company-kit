@@ -2,144 +2,144 @@
 
 可发布、可安装、可演示的 OpenClaw 多智能体公司模板仓库。
 
-目标：让你的公司化 OpenClaw 配置像标准开源项目一样被他人安装使用，而不是只能在你本机跑。
+一条命令完成安装，Web 配置中心按步填写，9 个智能体自动协同运转。
 
 ## Features
 
-- 7 角色研发公司模板（总监/产品/技术/开发/Reviewer/测试/增长）
-- 飞书群路由 + 角色 cron 调度模板
-- 研发驾驶舱（多视角 + 运行态 + 里程碑）
-- 每个角色独立 SOUL.md + AGENTS.md + MEMORY.md + HEARTBEAT.md + IDENTITY.md 配置
-- 安装/启动/停止/健康检查脚本
-- Docker Demo 模式（无 OpenClaw 也可先看效果）
-- 文档、示例、测试、CI、Issue/PR 模板
-- **共享工作区** `shared-context/` 跨代理协作（优先级/圆桌/产出/反馈）
-- **安全加固** 每个角色细粒度 `tools.allow/deny` + `exec-approvals.json` 命令白名单
-- **跨代理通信** `sessions_send/spawn` + 自动限制 pingpong 轮数
+### 核心能力
+- **9 角色智能体** — 总监 / 产品 / 技术总监 / 高级程序员 / Code Reviewer / 测试 / 增长 + 热搜 / AI 科技
+- **飞书群路由** + 13 条角色 cron 调度（晨会 / 午间同步 / 晚间复盘 / 周计划 / 情报雷达 / 健康巡检）
+- **研发驾驶舱** — 多视角 + 运行态 + 里程碑 + Issue 同步
+- **Web 配置中心** — 6 步向导（端口 → 项目 → 模型 → 飞书 → Discord/子代理 → 应用）
+
+### 多代理协同
+- **共享工作区** `shared-context/` — 优先级 / 圆桌记录 / 角色产出 / 用户反馈
+- **跨代理通信** `sessions_send` / `sessions_spawn` + pingpong 轮数限制
 - **结构化记忆** 角色专属 MEMORY.md 表格模板 + `memoryFlush` 自动蒸馏
-- **Gateway 自愈** `watchdog.sh` 指数退避重启 + 飞书告警
-- **子代理成本优化** `MODEL_SUBAGENT` 委派任务用低成本模型
-- **Discord 多通道** 可选 Discord 通道支持，与飞书并行
-- **生产部署** Caddy TLS 反向代理 + Docker Compose 一键部署
+- **全角色心跳** 9 个角色独立 HEARTBEAT.md 健康检查
+
+### 安全与可靠性
+- **细粒度权限** 每角色 `tools.allow/deny` + `exec-approvals.json` 命令白名单
+- **Gateway 自愈** `watchdog.sh` 指数退避重启（60s→30min）+ 飞书告警
+- **日志轮转** 启动时自动清理超过 5MB 的日志
+- **备份/恢复** `backup.sh` / `restore.sh` 一键归档配置与代理状态
+- **API 认证** 可选 Bearer Token 保护配置中心 API
+
+### 成本与部署
+- **子代理成本优化** `MODEL_SUBAGENT` 委派任务用低成本模型（节省 40-60% token）
+- **Discord 多通道** 可选 Discord 通道，与飞书并行
+- **生产部署** Caddy 自动 TLS + Docker Compose 一键部署（多阶段构建）
+- **跨平台** macOS / Linux 自动兼容（sed_inplace）
+
+### 工程质量
+- **CI 流水线** bash 语法 + ShellCheck + ruff Python lint + JSON 校验 + gitleaks 密钥扫描 + 20+ 单元测试
+- **pre-commit hook** `make hook` 一键安装本地检查
+- **Makefile** launch / install / start / stop / health / check / backup / restore / test
 
 ## Repository Layout
 
-- `scripts/`: install/start/stop/healthcheck/watchdog/release-check/onboard-wrapper
-- `templates/`: 配置模板（cron、群提示词、exec-approvals、agent 角色文件）
-- `dashboard/rd-dashboard/`: 驾驶舱与同步脚本
-- `web/setup.html`: 分步配置中心页面
-- `deploy/`: 生产部署（Caddyfile + docker-compose.prod.yml）
-- `docker/`: demo 数据 + 容器入口
-- `docs/`: 使用与架构文档
-- `examples/`: 流程示例
-- `tests/`: 基础单元测试
+```
+scripts/             安装 / 启动 / 停止 / 健康检查 / 备份恢复 / watchdog
+templates/           配置模板（cron / 群提示词 / exec-approvals / 9 角色文件）
+web/setup.html       6 步 Web 配置中心
+dashboard/           研发驾驶舱 + Issue 同步
+deploy/              生产部署（Caddyfile / docker-compose / Dockerfile）
+docker/              Demo 模式（静态数据 + 容器入口）
+tests/               单元测试
+docs/                使用与架构文档
+examples/            流程示例
+Makefile             便捷命令入口
+```
 
-## Quick Start (Native)
+## Quick Start
 
-### One-command launch (recommended on new computer)
+### 方式一：一键启动（推荐）
 
 ```bash
+git clone https://github.com/RosyDawns/openclaw-company-kit.git
+cd openclaw-company-kit
 bash scripts/launch.sh
 ```
 
-终端会先自动检测环境依赖（Node.js≥22、openclaw CLI、jq、python3、rsync），全部通过后才询问端口号。
+终端自动检测环境（Node.js ≥ 22、OpenClaw CLI、jq、python3、rsync、gh），通过后输入端口号，浏览器打开 Web 配置中心按步填写即可。
 
-New flow:
-- terminal checks environment dependencies with visual checklist
-- asks one port
-- opens web setup: first-time wizard or edit existing config
-- click to initialize (onboard → install → start → healthcheck)
-- dashboard at same port, jump back to setup center to edit and restart
+### 方式二：手动配置
 
-### Manual mode
-
-1. Create env file
 ```bash
 cp .env.example .env
+# 编辑 .env 填入必填项（GROUP_ID / FEISHU_HOT_APP_ID / FEISHU_HOT_APP_SECRET / PROJECT_PATH / PROJECT_REPO）
+make install
+make start
+make health
 ```
 
-2. Edit required values in `.env`
-- `GROUP_ID`
-- `FEISHU_HOT_APP_ID`
-- `FEISHU_HOT_APP_SECRET`
-- `PROJECT_PATH`
-- `PROJECT_REPO`
-
-3. Install
-```bash
-bash scripts/install.sh
-```
-
-4. Start
-```bash
-bash scripts/start.sh
-```
-
-5. Verify
-```bash
-bash scripts/healthcheck.sh
-```
-
-Optional legacy CLI wizard (advanced):
-```bash
-bash scripts/bootstrap.sh
-```
-
-Dashboard default:
-- `http://127.0.0.1:8788`
-
-## Quick Start (Docker Demo)
+### 方式三：Docker Demo（无需 OpenClaw）
 
 ```bash
 docker compose up --build -d
+# 打开 http://127.0.0.1:8788
 ```
 
-Open:
-- `http://127.0.0.1:8788`
-
-说明：Docker Demo 使用静态示例数据，不连接真实 OpenClaw/GitHub。
-
-## Developer Workflow
-
-Run full checks:
-```bash
-bash scripts/release-check.sh
-```
-
-Run tests only:
-```bash
-python3 -m unittest discover -s tests -p 'test_*.py' -v
-```
-
-Stop local services:
-```bash
-bash scripts/stop.sh
-```
-
-## Publish to GitHub
+### 方式四：Docker 生产部署
 
 ```bash
-git init
-git add .
-git commit -m "feat: openclaw company kit"
-git branch -M main
-git remote add origin <your-repo-url>
-git push -u origin main
+cp .env.example .env && vi .env
+cd deploy
+DOMAIN=your-domain.com docker compose -f docker-compose.prod.yml up -d
 ```
 
-## Security (Mandatory)
+详见 [deploy/README.md](deploy/README.md)。
 
-- Never commit `.env`
-- Never commit real `appSecret` / `GH_TOKEN`
-- Rotate secrets immediately if exposed
+## Makefile 命令
 
-See: [docs/security.md](docs/security.md)
+| 命令 | 说明 |
+|------|------|
+| `make launch` | 一键启动（环境检测 + Web 配置） |
+| `make install` | 安装配置到 profile |
+| `make start` | 启动所有服务 |
+| `make stop` | 停止所有服务 |
+| `make health` | 健康检查 |
+| `make check` | 发布前全量检查 |
+| `make backup` | 备份配置 + 代理状态 |
+| `make restore ARCHIVE=...` | 从备份恢复 |
+| `make test` | 运行单元测试 |
+| `make hook` | 安装 pre-commit hook |
+
+## Environment Variables
+
+关键变量（完整列表见 [.env.example](.env.example)）：
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `GROUP_ID` | ✅ | 飞书群 ID |
+| `FEISHU_HOT_APP_ID` | ✅ | 飞书应用 App ID |
+| `FEISHU_HOT_APP_SECRET` | ✅ | 飞书应用 App Secret |
+| `PROJECT_PATH` | ✅ | 项目本地路径 |
+| `PROJECT_REPO` | ✅ | GitHub 仓库（org/repo） |
+| `GH_TOKEN` | 推荐 | GitHub Token（gh-issues skill） |
+| `MODEL_PRIMARY` | 可选 | 主模型（如 deepseek/deepseek-chat） |
+| `MODEL_SUBAGENT` | 可选 | 子代理低成本模型 |
+| `DISCORD_BOT_TOKEN` | 可选 | Discord Bot Token |
+| `CONTROL_TOKEN` | 可选 | 配置中心 API 认证 Token |
+| `REFRESH_INTERVAL` | 可选 | 驾驶舱刷新间隔（默认 300s） |
+
+## Security
+
+- **绝不** 提交 `.env` 文件
+- **绝不** 提交真实的 `appSecret` / `GH_TOKEN` / `DISCORD_BOT_TOKEN`
+- 密钥泄露后立即轮换
+- CI 已集成 gitleaks 自动扫描
+- 配置中心支持 `CONTROL_TOKEN` 认证保护
+
+详见 [docs/security.md](docs/security.md)
 
 ## Documentation
 
-- [docs/getting-started.md](docs/getting-started.md)
-- [docs/architecture.md](docs/architecture.md)
-- [docs/deployment.md](docs/deployment.md)
-- [docs/troubleshooting.md](docs/troubleshooting.md)
-- [ROADMAP.md](ROADMAP.md)
-- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [docs/getting-started.md](docs/getting-started.md) — 快速上手
+- [docs/architecture.md](docs/architecture.md) — 架构设计
+- [docs/deployment.md](docs/deployment.md) — 部署指南
+- [docs/troubleshooting.md](docs/troubleshooting.md) — 故障排查
+- [deploy/README.md](deploy/README.md) — 生产部署
+- [CHANGELOG.md](CHANGELOG.md) — 变更日志
+- [ROADMAP.md](ROADMAP.md) — 路线图
+- [CONTRIBUTING.md](CONTRIBUTING.md) — 贡献指南
