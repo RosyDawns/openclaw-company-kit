@@ -58,6 +58,12 @@ restart_gateway() {
   sleep "${backoff}"
 }
 
+cleanup() {
+  log "watchdog received shutdown signal, exiting gracefully"
+  exit 0
+}
+trap cleanup SIGTERM SIGINT SIGHUP
+
 log "watchdog started (interval=${CHECK_INTERVAL}s, max_restarts=${MAX_RESTARTS})"
 
 while true; do

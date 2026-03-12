@@ -28,6 +28,7 @@ jobs:
           bash -n scripts/stop.sh
           bash -n scripts/healthcheck.sh
           bash -n scripts/watchdog.sh
+          bash -n scripts/onboard-wrapper.sh
           bash -n scripts/demo-up.sh
           bash -n scripts/demo-down.sh
           bash -n scripts/release-check.sh
@@ -36,7 +37,7 @@ jobs:
       - name: ShellCheck lint
         run: |
           sudo apt-get install -y shellcheck
-          shellcheck -x -S warning scripts/*.sh docker/entrypoint.sh || true
+          shellcheck -x -S error scripts/*.sh docker/entrypoint.sh
 
       - name: Python syntax check
         run: |
@@ -46,7 +47,7 @@ jobs:
       - name: Python lint (ruff)
         run: |
           pip install ruff
-          ruff check --select=E,F,W . || true
+          ruff check --select=E,F . --ignore=E501
 
       - name: JSON validation (all templates)
         run: |

@@ -31,11 +31,26 @@ RUN_DIR="${PROFILE_DIR}/run"
 LOG_DIR="${PROFILE_DIR}/logs"
 mkdir -p "${RUN_DIR}" "${LOG_DIR}"
 
+rotate_log() {
+  local log_file="$1"
+  local max_size="${LOG_MAX_BYTES:-5242880}"  # 5MB default
+  if [ -f "${log_file}" ]; then
+    local size
+    size=$(wc -c < "${log_file}" 2>/dev/null || echo 0)
+    if [ "${size}" -gt "${max_size}" ]; then
+      mv "${log_file}" "${log_file}.1"
+      : > "${log_file}"
+    fi
+  fi
+}
+
 start_bg() {
   local name="$1"
   local cmd="$2"
   local pid_file="${RUN_DIR}/${name}.pid"
   local log_file="${LOG_DIR}/${name}.log"
+
+  rotate_log "${log_file}"
 
   if [ -f "${pid_file}" ]; then
     local pid

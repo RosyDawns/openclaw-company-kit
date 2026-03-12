@@ -12,6 +12,8 @@ bash -n scripts/launch.sh
 bash -n scripts/start.sh
 bash -n scripts/stop.sh
 bash -n scripts/healthcheck.sh
+bash -n scripts/watchdog.sh
+bash -n scripts/onboard-wrapper.sh
 bash -n scripts/demo-up.sh
 bash -n scripts/demo-down.sh
 bash -n scripts/release-check.sh
@@ -22,6 +24,7 @@ bash -n docker/entrypoint.sh
 
 jq -e . templates/jobs.template.json >/dev/null
 jq -e . templates/company-project.template.json >/dev/null
+jq -e . templates/exec-approvals.template.json >/dev/null
 jq -e . docker/demo_data/dashboard-data.json >/dev/null
 jq -e . docker/demo_data/business-metrics.json >/dev/null
 

@@ -34,6 +34,9 @@ htmlcov/
 project_document/
 *.bak
 
+# Backups
+backups/
+
 # Runtime cache
 data/
 dashboard/rd-dashboard/dashboard-data.json

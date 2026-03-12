@@ -1,15 +1,33 @@
-SHELL := /bin/bash
+.PHONY: launch install start stop health check backup restore clean
 
-.PHONY: check test demo-up demo-down
+launch:
+	bash scripts/launch.sh
+
+install:
+	bash scripts/install.sh
+
+start:
+	bash scripts/start.sh
+
+stop:
+	bash scripts/stop.sh
+
+health:
+	bash scripts/healthcheck.sh
 
 check:
 	bash scripts/release-check.sh
 
+backup:
+	bash scripts/backup.sh
+
+restore:
+	@echo "Usage: make restore ARCHIVE=backups/<file>.tar.gz"
+	@test -n "$(ARCHIVE)" && bash scripts/restore.sh "$(ARCHIVE)" || true
+
 test:
 	python3 -m unittest discover -s tests -p 'test_*.py' -v
 
-demo-up:
-	docker compose up --build -d
-
-demo-down:
-	docker compose down
+clean:
+	bash scripts/stop.sh 2>/dev/null || true
+	rm -rf backups/
