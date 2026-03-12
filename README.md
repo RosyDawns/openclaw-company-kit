@@ -9,13 +9,14 @@
 - 7 角色研发公司模板（总监/产品/技术/开发/Reviewer/测试/增长）
 - 飞书群路由 + 角色 cron 调度模板
 - 研发驾驶舱（多视角 + 运行态 + 里程碑）
+- 每个角色独立 SOUL.md + AGENTS.md + MEMORY.md 人格配置
 - 安装/启动/停止/健康检查脚本
 - Docker Demo 模式（无 OpenClaw 也可先看效果）
 - 文档、示例、测试、CI、Issue/PR 模板
 
 ## Repository Layout
 
-- `scripts/`: install/start/stop/healthcheck/release-check
+- `scripts/`: install/start/stop/healthcheck/release-check/onboard-wrapper
 - `templates/`: 配置模板（cron、群提示词、公司关联）
 - `dashboard/rd-dashboard/`: 驾驶舱与同步脚本
 - `web/setup.html`: 分步配置中心页面
@@ -32,12 +33,14 @@
 bash scripts/launch.sh
 ```
 
+终端会先自动检测环境依赖（Node.js≥22、openclaw CLI、jq、python3、rsync），全部通过后才询问端口号。
+
 New flow:
-- terminal only asks one port
-- opens a web setup page: `http://127.0.0.1:<port>/setup`
-- step-by-step configure model/provider, project, Feishu, GitHub token
-- click once to apply and auto-run `stop -> install -> start`
-- dashboard can jump back to setup center (`配置中心`) to edit config and restart
+- terminal checks environment dependencies with visual checklist
+- asks one port
+- opens web setup: first-time wizard or edit existing config
+- click to initialize (onboard → install → start → healthcheck)
+- dashboard at same port, jump back to setup center to edit and restart
 
 ### Manual mode
 

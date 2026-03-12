@@ -240,12 +240,26 @@ trigger_followup_pipeline_after_senior_dev() {
     return 0
   fi
 
-  log "pipeline trigger: senior-dev runAt=${senior_last_run}, run tech+product+reviewer+qa"
+  log "pipeline trigger: senior-dev runAt=${senior_last_run}, run tech||product then reviewer->qa"
+  local tech_tmp="${TMPDIR:-/tmp}/issue-sync-tech-output.$$.txt"
+  local product_tmp="${TMPDIR:-/tmp}/issue-sync-product-output.$$.txt"
   set +e
-  tech_output="$("${OPENCLAW_BIN}" cron run "${CRON_PIPELINE_TECH_JOB_ID}" --timeout 60000 2>&1)"
-  tech_rc=$?
-  product_output="$("${OPENCLAW_BIN}" cron run "${CRON_PIPELINE_PRODUCT_JOB_ID}" --timeout 60000 2>&1)"
-  product_rc=$?
+  (
+    "${OPENCLAW_BIN}" cron run "${CRON_PIPELINE_TECH_JOB_ID}" --timeout 60000 2>&1
+    printf '%d' "$?" > "${tech_tmp}.rc"
+  ) > "${tech_tmp}" 2>&1 &
+  local pid_tech=$!
+  (
+    "${OPENCLAW_BIN}" cron run "${CRON_PIPELINE_PRODUCT_JOB_ID}" --timeout 60000 2>&1
+    printf '%d' "$?" > "${product_tmp}.rc"
+  ) > "${product_tmp}" 2>&1 &
+  local pid_product=$!
+  wait "${pid_tech}" "${pid_product}" || true
+  tech_output="$(cat "${tech_tmp}" 2>/dev/null || true)"
+  tech_rc="$(cat "${tech_tmp}.rc" 2>/dev/null || echo 1)"
+  product_output="$(cat "${product_tmp}" 2>/dev/null || true)"
+  product_rc="$(cat "${product_tmp}.rc" 2>/dev/null || echo 1)"
+  rm -f "${tech_tmp}" "${tech_tmp}.rc" "${product_tmp}" "${product_tmp}.rc" >/dev/null 2>&1 || true
   reviewer_output="$("${OPENCLAW_BIN}" cron run "${CRON_PIPELINE_REVIEWER_JOB_ID}" --timeout 60000 2>&1)"
   reviewer_rc=$?
   qa_output="$("${OPENCLAW_BIN}" cron run "${CRON_PIPELINE_QA_JOB_ID}" --timeout 60000 2>&1)"
@@ -265,12 +279,12 @@ trigger_followup_pipeline_after_senior_dev() {
 
   now_text="$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')"
   if [ "${tech_status}" = "ok" ] && [ "${product_status}" = "ok" ] && [ "${reviewer_status}" = "ok" ] && [ "${qa_status}" = "ok" ]; then
-    message=$'【流水线调度】自动串行触发成功\n- 上游：高级程序员已完成新一轮执行\n- 下游：技术总监='"${tech_status}"$'，产品经理='"${product_status}"$'，Reviewer='"${reviewer_status}"$'，测试='"${qa_status}"$'\n- 时间：'"${now_text}"
+    message=$'【流水线调度】自动调度触发成功\n- 上游：高级程序员已完成新一轮执行\n- 下游：技术总监='"${tech_status}"$'，产品经理='"${product_status}"$'，Reviewer='"${reviewer_status}"$'，测试='"${qa_status}"$'\n- 时间：'"${now_text}"
     send_cron_guard_notice "${message}"
     return 0
   fi
 
-  message=$'【流水线调度】自动串行触发异常\n- 上游：高级程序员已完成新一轮执行\n- 下游：技术总监='"${tech_status}"$' (exit='"${tech_rc}"$')，产品经理='"${product_status}"$' (exit='"${product_rc}"$')，Reviewer='"${reviewer_status}"$' (exit='"${reviewer_rc}"$')，测试='"${qa_status}"$' (exit='"${qa_rc}"$')\n- 时间：'"${now_text}"$'\n- 技术总监日志：'"$(humanize_cron_error "${tech_output}")"$'\n- 产品经理日志：'"$(humanize_cron_error "${product_output}")"$'\n- Reviewer日志：'"$(humanize_cron_error "${reviewer_output}")"$'\n- 测试日志：'"$(humanize_cron_error "${qa_output}")"
+  message=$'【流水线调度】自动调度触发异常\n- 上游：高级程序员已完成新一轮执行\n- 下游：技术总监='"${tech_status}"$' (exit='"${tech_rc}"$')，产品经理='"${product_status}"$' (exit='"${product_rc}"$')，Reviewer='"${reviewer_status}"$' (exit='"${reviewer_rc}"$')，测试='"${qa_status}"$' (exit='"${qa_rc}"$')\n- 时间：'"${now_text}"$'\n- 技术总监日志：'"$(humanize_cron_error "${tech_output}")"$'\n- 产品经理日志：'"$(humanize_cron_error "${product_output}")"$'\n- Reviewer日志：'"$(humanize_cron_error "${reviewer_output}")"$'\n- 测试日志：'"$(humanize_cron_error "${qa_output}")"
   send_cron_guard_notice "${message}"
   return 0
 }

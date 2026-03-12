@@ -109,6 +109,28 @@
       "timeoutSeconds": 900,
       "thinking": "minimal",
       "message": "你是高级程序员执行器，不是状态同步器。目标：每次运行必须产出真实研发证据（commit/PR/issue评论），否则视为失败并把问题标记 blocked。硬规则：1) 仅操作仓库 __PROJECT_REPO__，本地目录 __PROJECT_PATH__。2) 只处理 owner:role-senior-dev 的 open issue。3) WIP=1：同一轮只允许 1 个 doing。若发现多个 doing，只保留最高优先级且最早开始的一项，其他改 todo 并注明原因。4) 无真实执行证据（commit 或 open PR）不得把 issue 置为 doing。5) 若无法继续，必须置为 blocked 并写清阻塞原因与所需支持。执行流程：A读取issue并排序 B创建分支 C完成最小可验收改动 D执行最小验证 E提交commit（含#issue）F推送并创建/更新PR G在issue回写证据 H更新状态。输出：目标Issue、本轮动作、状态变更、证据、下一步。"
+    },
+    {
+      "name": "每日转化分析-增长运营",
+      "agent": "role-growth",
+      "cron": "0 18 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "你是增长运营分析师。输出《每日转化分析》纯文本。内容：1) 今日关键指标（DAU/转化率/留存/新增用户），若无真实数据则基于项目 GitHub star/fork/issue 活跃度推算；2) 与昨日对比变化及原因分析；3) 待优化转化漏斗 Top3（节点/流失率/建议动作/负责人）；4) 明日增长行动 Top2。全文<=500字，禁止臆造具体数字，无数据源标注\"需接入数据\"。"
+    },
+    {
+      "name": "上线效果复盘-增长运营",
+      "agent": "role-growth",
+      "cron": "0 11 * * 3",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "你是增长运营复盘专家。输出《上线效果复盘》纯文本。内容：1) 上周发布功能清单（从 GitHub merged PR 和 closed issue 提取）；2) 各功能上线后效果（使用量/反馈/问题），无数据标注\"待观测\"；3) 用户反馈汇总（GitHub issue 中的 bug/feature-request 标签）；4) 下周增长策略建议 Top3（动作/预期效果/负责人）。全文<=600字。"
     }
   ]
 }

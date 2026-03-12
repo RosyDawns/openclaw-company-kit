@@ -229,6 +229,10 @@
         font-size: 12px;
       }
 
+      .banner { padding: 8px 10px; border-radius: 10px; font-size: 12px; text-align: center; margin-bottom: 10px; }
+      .banner.first-time { background: rgba(86, 194, 255, 0.18); border: 1px solid rgba(86, 194, 255, 0.6); color: var(--accent); }
+      .banner.edit-mode { background: rgba(55, 211, 153, 0.12); border: 1px solid rgba(55, 211, 153, 0.4); color: var(--ok); }
+
       @media (max-width: 980px) {
         .wrap {
           grid-template-columns: 1fr;
@@ -248,6 +252,7 @@
       <aside class="side glass">
         <h1>配置中心</h1>
         <div class="sub">只需一次配置，后续可在这里随时改参数并重启服务。</div>
+        <div id="modeBanner"></div>
         <div id="steps" class="steps"></div>
         <div class="links">
           <a class="btn" href="/dashboard/" target="_self">打开驾驶舱</a>
@@ -297,6 +302,7 @@
         config: {},
         taskId: "",
         taskTimer: null,
+        firstTime: false,
       };
 
       function esc(v) {
@@ -319,6 +325,12 @@
       }
 
       function updateStepNav() {
+        const bannerEl = byId("modeBanner");
+        if (bannerEl) {
+          bannerEl.innerHTML = state.firstTime
+            ? '<div class="banner first-time">首次配置向导</div>'
+            : '<div class="banner edit-mode">编辑已有配置</div>';
+        }
         byId("steps").innerHTML = steps
           .map((s, idx) => `<div class="step ${idx === state.stepIdx ? "active" : ""}" data-idx="${idx}">${esc(s.label)}</div>`)
           .join("");
@@ -497,7 +509,8 @@
             <article class="card split">
               <div>
                 <h2>应用配置并重启</h2>
-                <p class="hint">点击“应用并重启服务”后，会自动执行：<code>stop -> install -> start</code>。</p>
+                <div id="preflightResult" class="muted" style="margin-bottom:8px;">正在检测环境...</div>
+                <p class="hint">点击“${state.firstTime ? "初始化并启动" : "应用并重启服务"}”后，会自动执行：<code>${state.firstTime ? "onboard → install → start → healthcheck" : "stop → install → start → healthcheck"}</code>。</p>
                 <div id="taskTips" class="muted">等待操作...</div>
                 <div style="margin-top:8px;">
                   <label>任务日志</label>
@@ -527,6 +540,25 @@
 
         if (key === "step-run") {
           refreshServiceStatus();
+          api("/api/preflight").then(pf => {
+            const el = byId("preflightResult");
+            if (!el) return;
+            const checks = pf.checks || [];
+            const lines = checks.map(c => {
+              const icon = c.ok ? '<span style="color:var(--ok)">✓</span>' : '<span style="color:var(--err)">✗</span>';
+              const ver = c.version ? ` (${esc(c.version)})` : '';
+              return `${icon} ${esc(c.name)}${ver}`;
+            });
+            el.innerHTML = lines.join(' &nbsp; ');
+          }).catch(() => {
+            const el = byId("preflightResult");
+            if (el) el.textContent = "环境检测失败";
+          });
+        }
+
+        const applyBtn = byId("btnApply");
+        if (applyBtn) {
+          applyBtn.textContent = state.firstTime ? "初始化并启动" : "应用并重启服务";
         }
       }
 
@@ -546,6 +578,7 @@
       async function loadConfig() {
         const data = await api("/api/config");
         state.config = data.config || {};
+        state.firstTime = data.firstTime ?? false;
         setStatus("配置已加载", "ok");
       }
 
@@ -575,6 +608,19 @@
           setStatus(`缺少必填: ${miss.join(", ")}`, "err");
           return;
         }
+
+        try {
+          const pf = await api("/api/preflight");
+          if (!pf.allPassed) {
+            const failed = (pf.checks || []).filter(c => !c.ok).map(c => c.name);
+            setStatus(`环境检测未通过: ${failed.join(", ")}`, "err");
+            return;
+          }
+        } catch (err) {
+          setStatus(`预检失败: ${err.message}`, "err");
+          return;
+        }
+
         state.config = cfg;
         await startTask("/api/config/apply", { config: cfg });
       }

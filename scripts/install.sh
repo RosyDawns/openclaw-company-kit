@@ -37,9 +37,17 @@ echo "[install] config=${PROFILE_DIR}/openclaw.json"
 
 for agent_id in hot-search ai-tech rd-company role-product role-tech-director role-senior-dev role-growth role-code-reviewer role-qa-test; do
   mkdir -p "${TARGET_AGENTS_DIR}/${agent_id}"
-  if [ -f "${ROOT_DIR}/templates/agents/${agent_id}/SOUL.md" ]; then
-    cp "${ROOT_DIR}/templates/agents/${agent_id}/SOUL.md" "${TARGET_AGENTS_DIR}/${agent_id}/SOUL.md"
-  fi
+  for mdfile in SOUL.md AGENTS.md MEMORY.md HEARTBEAT.md; do
+    if [ -f "${ROOT_DIR}/templates/agents/${agent_id}/${mdfile}" ]; then
+      cp "${ROOT_DIR}/templates/agents/${agent_id}/${mdfile}" "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
+    fi
+    if [ -f "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}" ]; then
+      sed -i '' \
+        -e "s|__PROJECT_PATH__|${PROJECT_PATH}|g" \
+        -e "s|__PROJECT_REPO__|${PROJECT_REPO}|g" \
+        "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
+    fi
+  done
 done
 
 GROUP_PROMPT="$(sed \
@@ -67,6 +75,8 @@ jq \
   --arg prompt "${GROUP_PROMPT}" \
   '
   .agents.defaults.workspace = ($stateDir + "/workspace") |
+  .agents.defaults.heartbeat = {"every": "30m", "target": "last", "activeHours": {"start": "08:00", "end": "22:00"}} |
+  .agents.defaults.compaction = {"enabled": true, "memoryFlush": {"enabled": true}} |
   (if $modelPrimary != "" then .agents.defaults.model.primary = $modelPrimary else . end) |
   .agents.list = [
     {"id":"main","default":true,"name":"主助手","workspace":($stateDir + "/workspace")},

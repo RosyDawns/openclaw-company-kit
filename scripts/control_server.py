@@ -11,6 +11,7 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -183,9 +184,16 @@ def profile_dir(config: dict[str, str]) -> Path:
     return Path.home() / f".openclaw-{profile}"
 
 
+def resolved_dashboard_dir(config: dict[str, str]) -> Path:
+    deployed = profile_dir(config) / "workspace" / "rd-dashboard"
+    if deployed.is_dir():
+        return deployed
+    return ROOT_DIR / "dashboard" / "rd-dashboard"
+
+
 def collect_service_status(config: dict[str, str]) -> dict:
     run_dir = profile_dir(config) / "run"
-    service_names = ["dashboard-http", "dashboard-refresh-loop", "issue-sync-loop"]
+    service_names = ["dashboard-refresh-loop", "issue-sync-loop"]
     services = []
 
     for name in service_names:
@@ -208,6 +216,39 @@ def collect_service_status(config: dict[str, str]) -> dict:
         "runDir": str(run_dir),
         "services": services,
     }
+
+
+def preflight_check(config: dict[str, str]) -> dict:
+    checks: list[dict] = []
+
+    required_tools = ["node", "openclaw", "jq", "python3", "rsync"]
+    for tool in required_tools:
+        found = shutil.which(tool) is not None
+        entry: dict = {"name": tool, "ok": found, "type": "tool"}
+        if tool == "node" and found:
+            try:
+                raw = subprocess.check_output(["node", "-v"], text=True).strip()
+                entry["version"] = raw
+                major = int(raw.lstrip("v").split(".")[0])
+                if major < 22:
+                    entry["ok"] = False
+            except Exception:
+                entry["ok"] = False
+        checks.append(entry)
+
+    required_vars = ["GROUP_ID", "FEISHU_HOT_APP_ID", "FEISHU_HOT_APP_SECRET"]
+    for var in required_vars:
+        checks.append({"name": var, "ok": bool(config.get(var, "").strip()), "type": "env"})
+
+    oc_config_path = profile_dir(config) / "openclaw.json"
+    source_path = config.get("SOURCE_OPENCLAW_CONFIG", "").strip()
+    oc_ok = oc_config_path.exists()
+    if not oc_ok and source_path:
+        oc_ok = Path(source_path).expanduser().exists()
+    checks.append({"name": "openclaw_config", "ok": oc_ok, "type": "config"})
+
+    all_passed = all(c["ok"] for c in checks)
+    return {"ok": True, "checks": checks, "allPassed": all_passed}
 
 
 def append_task_log(task_id: str, line: str) -> None:
@@ -342,16 +383,18 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _serve_dashboard(self, path: str) -> None:
+        dash_dir = resolved_dashboard_dir(merged_config())
+
         if path in {"/dashboard", "/dashboard/"}:
-            file_path = DASHBOARD_DIR / "index.html"
+            file_path = dash_dir / "index.html"
             self._serve_file(file_path)
             return
 
         rel = path[len("/dashboard/") :]
         rel_path = Path(rel)
-        file_path = (DASHBOARD_DIR / rel_path).resolve()
+        file_path = (dash_dir / rel_path).resolve()
 
-        dashboard_root = DASHBOARD_DIR.resolve()
+        dashboard_root = dash_dir.resolve()
         if dashboard_root not in file_path.parents and file_path != dashboard_root:
             self._send_text("Forbidden", HTTPStatus.FORBIDDEN)
             return
@@ -379,12 +422,19 @@ class ControlHandler(BaseHTTPRequestHandler):
 
         if path == "/api/config":
             cfg = merged_config()
+            first_time = not ENV_FILE.exists() or not cfg.get("GROUP_ID", "").strip()
             self._send_json({
                 "ok": True,
                 "config": cfg,
+                "firstTime": first_time,
                 "service": collect_service_status(cfg),
                 "server": {"rootDir": str(ROOT_DIR)},
             })
+            return
+
+        if path == "/api/preflight":
+            cfg = merged_config()
+            self._send_json(preflight_check(cfg))
             return
 
         if path == "/api/service/status":
@@ -447,8 +497,10 @@ class ControlHandler(BaseHTTPRequestHandler):
                 "apply",
                 [
                     ("stop", ["bash", "scripts/stop.sh"]),
+                    ("onboard", ["bash", "scripts/onboard-wrapper.sh"]),
                     ("install", ["bash", "scripts/install.sh"]),
                     ("start", ["bash", "scripts/start.sh"]),
+                    ("healthcheck", ["bash", "scripts/healthcheck.sh"]),
                 ],
             )
             self._send_json({"ok": True, "taskId": task["id"]})
@@ -460,6 +512,7 @@ class ControlHandler(BaseHTTPRequestHandler):
                 [
                     ("stop", ["bash", "scripts/stop.sh"]),
                     ("start", ["bash", "scripts/start.sh"]),
+                    ("healthcheck", ["bash", "scripts/healthcheck.sh"]),
                 ],
             )
             self._send_json({"ok": True, "taskId": task["id"]})

@@ -57,15 +57,8 @@ ocp gateway start >/dev/null 2>&1 || true
 cd "${TARGET_DASHBOARD_DIR}"
 ./refresh.sh >/dev/null 2>&1 || true
 
-if lsof -nP -iTCP:"${DASHBOARD_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "[start] dashboard http server already listening on :${DASHBOARD_PORT}"
-else
-  start_bg "dashboard-http" "cd '${TARGET_DASHBOARD_DIR}' && export DASHBOARD_PORT='${DASHBOARD_PORT}' && python3 -m http.server '${DASHBOARD_PORT}' --bind 127.0.0.1"
-fi
-
 start_bg "dashboard-refresh-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./refresh.sh; sleep 300; done"
 start_bg "issue-sync-loop" "cd '${TARGET_DASHBOARD_DIR}' && set -a && [ -f .env.runtime ] && source .env.runtime || true; set +a; while true; do ./issue-sync.sh; sleep 300; done"
 
 echo "[OK] services started"
-echo "Dashboard: http://127.0.0.1:${DASHBOARD_PORT}"
 echo "Profile: ${OPENCLAW_PROFILE}"
