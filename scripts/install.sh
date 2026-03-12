@@ -43,7 +43,7 @@ echo "[install] config=${PROFILE_DIR}/openclaw.json"
 
 for agent_id in hot-search ai-tech rd-company role-product role-tech-director role-senior-dev role-growth role-code-reviewer role-qa-test; do
   mkdir -p "${TARGET_AGENTS_DIR}/${agent_id}"
-  for mdfile in SOUL.md AGENTS.md MEMORY.md HEARTBEAT.md; do
+  for mdfile in SOUL.md AGENTS.md MEMORY.md HEARTBEAT.md IDENTITY.md TOOLS.md USER.md BOOTSTRAP.md; do
     if [ -f "${ROOT_DIR}/templates/agents/${agent_id}/${mdfile}" ]; then
       cp "${ROOT_DIR}/templates/agents/${agent_id}/${mdfile}" "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
     fi
@@ -51,6 +51,9 @@ for agent_id in hot-search ai-tech rd-company role-product role-tech-director ro
       sed -i '' \
         -e "s|__PROJECT_PATH__|${PROJECT_PATH}|g" \
         -e "s|__PROJECT_REPO__|${PROJECT_REPO}|g" \
+        -e "s|__COMPANY_NAME__|${COMPANY_NAME}|g" \
+        -e "s|__FEISHU_HOT_BOT_NAME__|${FEISHU_HOT_BOT_NAME}|g" \
+        -e "s|__FEISHU_AI_BOT_NAME__|${FEISHU_AI_BOT_NAME}|g" \
         "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
     fi
   done
@@ -145,6 +148,13 @@ jq \
       "systemPrompt": $prompt
     }
   }) |
+  .commands.native = "auto" |
+  .commands.nativeSkills = "auto" |
+  .commands.restart = true |
+  .commands.ownerDisplay = "raw" |
+  .tools.profile = "messaging" |
+  .messages.ackReactionScope = "group-mentions" |
+  .session.dmScope = "per-channel-peer" |
   .skills = (.skills // {}) |
   .skills.entries = (.skills.entries // {}) |
   (if $ghToken != "" then .skills.entries["gh-issues"] = {"apiKey": $ghToken} else . end)

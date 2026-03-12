@@ -231,7 +231,7 @@ def collect_service_status(config: dict[str, str]) -> dict:
 def preflight_check(config: dict[str, str]) -> dict:
     checks: list[dict] = []
 
-    required_tools = ["node", "openclaw", "jq", "python3", "rsync"]
+    required_tools = ["node", "openclaw", "jq", "python3", "rsync", "gh"]
     for tool in required_tools:
         found = shutil.which(tool) is not None
         entry: dict = {"name": tool, "ok": found, "type": "tool"}
@@ -245,6 +245,25 @@ def preflight_check(config: dict[str, str]) -> dict:
             except Exception:
                 entry["ok"] = False
         checks.append(entry)
+
+    # gh-issues skill auth check (non-blocking)
+    gh_token = config.get("GH_TOKEN", "").strip()
+    gh_auth_ok = False
+    if gh_token:
+        gh_auth_ok = True
+    elif shutil.which("gh"):
+        try:
+            r = subprocess.run(["gh", "auth", "status"], capture_output=True, timeout=5)
+            gh_auth_ok = r.returncode == 0
+        except Exception:
+            pass
+    checks.append({
+        "name": "gh_auth",
+        "ok": gh_auth_ok,
+        "type": "auth",
+        "hint": "配置 GH_TOKEN 或运行 gh auth login",
+        "blocking": False,
+    })
 
     required_vars = ["GROUP_ID", "FEISHU_HOT_APP_ID", "FEISHU_HOT_APP_SECRET"]
     for var in required_vars:

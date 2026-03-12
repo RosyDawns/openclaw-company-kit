@@ -63,7 +63,7 @@ required_var() {
 
 check_cmds() {
   local missing=0
-  for c in openclaw jq python3 rsync; do
+  for c in openclaw jq python3 rsync gh; do
     if ! command -v "${c}" >/dev/null 2>&1; then
       echo "[ERROR] missing command: ${c}" >&2
       missing=1
