@@ -273,9 +273,9 @@ main() {
   local with_ai_account
 
   profile="$(prompt_default "OpenClaw profile" "company")"
-  company_name="$(prompt_default "Company name" "AI 转职一人公司")"
-  project_path="$(prompt_default "Project path" "${HOME}/ai-agent-guide")"
-  project_repo="$(prompt_default "Project repo slug (owner/repo)" "owner/repo")"
+  company_name="$(prompt_default "Company name" "OpenClaw Company")"
+  project_path="$(prompt_default "Project path" "/path/to/your-project")"
+  project_repo="$(prompt_default "Project repo slug (owner/repo)" "your-org/your-repo")"
 
   provider_select
   collect_provider_auth

@@ -13,9 +13,9 @@ load_env() {
   fi
 
   OPENCLAW_PROFILE="${OPENCLAW_PROFILE:-company}"
-  COMPANY_NAME="${COMPANY_NAME:-AI 转职一人公司}"
-  PROJECT_PATH="${PROJECT_PATH:-${HOME}/ai-agent-guide}"
-  PROJECT_REPO="${PROJECT_REPO:-owner/repo}"
+  COMPANY_NAME="${COMPANY_NAME:-OpenClaw Company}"
+  PROJECT_PATH="${PROJECT_PATH:-/path/to/your-project}"
+  PROJECT_REPO="${PROJECT_REPO:-your-org/your-repo}"
 
   GROUP_ID="${GROUP_ID:-}"
 
