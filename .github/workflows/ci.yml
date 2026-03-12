@@ -17,13 +17,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: JSON validation
-        run: |
-          jq -e . templates/jobs.template.json >/dev/null
-          jq -e . templates/company-project.template.json >/dev/null
-          jq -e . docker/demo_data/dashboard-data.json >/dev/null
-          jq -e . docker/demo_data/business-metrics.json >/dev/null
-
       - name: Shell syntax check
         run: |
           bash -n scripts/_common.sh
@@ -34,15 +27,34 @@ jobs:
           bash -n scripts/start.sh
           bash -n scripts/stop.sh
           bash -n scripts/healthcheck.sh
+          bash -n scripts/watchdog.sh
           bash -n scripts/demo-up.sh
           bash -n scripts/demo-down.sh
           bash -n scripts/release-check.sh
           bash -n docker/entrypoint.sh
 
+      - name: ShellCheck lint
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck -x -S warning scripts/*.sh docker/entrypoint.sh || true
+
       - name: Python syntax check
         run: |
           python3 -m py_compile dashboard/rd-dashboard/dashboard_data.py
           python3 -m py_compile scripts/control_server.py
+
+      - name: Python lint (ruff)
+        run: |
+          pip install ruff
+          ruff check --select=E,F,W . || true
+
+      - name: JSON validation (all templates)
+        run: |
+          jq -e . templates/jobs.template.json >/dev/null
+          jq -e . templates/company-project.template.json >/dev/null
+          jq -e . templates/exec-approvals.template.json >/dev/null
+          jq -e . docker/demo_data/dashboard-data.json >/dev/null
+          jq -e . docker/demo_data/business-metrics.json >/dev/null
 
       - name: Unit tests
         run: |

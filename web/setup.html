@@ -284,7 +284,8 @@
         { id: "step-project", label: "2) 公司与项目" },
         { id: "step-model", label: "3) 模型与密钥" },
         { id: "step-feishu", label: "4) 飞书配置" },
-        { id: "step-run", label: "5) 应用与状态" },
+        { id: "step-extra", label: "5) 扩展通道" },
+        { id: "step-run", label: "6) 应用与状态" },
       ];
 
       const modelPresets = {
@@ -372,6 +373,10 @@
           "CUSTOM_MODEL_ID",
           "CUSTOM_PROVIDER_ID",
           "CUSTOM_COMPATIBILITY",
+          "MODEL_SUBAGENT",
+          "DISCORD_BOT_TOKEN",
+          "DISCORD_GUILD_ID",
+          "DISCORD_CHANNEL_ID",
         ];
         ids.forEach((k) => {
           const v = byId(k);
@@ -542,6 +547,35 @@
                 <div class="field">
                   <label>FEISHU_AI_APP_SECRET (可选)</label>
                   <input id="FEISHU_AI_APP_SECRET" type="password" value="${esc(c.FEISHU_AI_APP_SECRET || "")}" />
+                </div>
+              </div>
+            </article>
+          `,
+
+          "step-extra": `
+            <article class="card">
+              <h2>扩展通道与子代理</h2>
+              <p class="hint">Discord 通道为可选项，填写后自动启用。子代理模型可用低成本模型节省 40-60% token。</p>
+              <div class="grid">
+                <div class="field" style="grid-column:1 / -1;">
+                  <label>MODEL_SUBAGENT (可选，委派子任务用的低成本模型)</label>
+                  <input id="MODEL_SUBAGENT" value="${esc(c.MODEL_SUBAGENT || "")}" placeholder="如 claude-3-haiku / deepseek-chat" />
+                </div>
+              </div>
+              <h3 style="margin-top:18px;">Discord 通道（可选）</h3>
+              <p class="muted">需在 <a href="https://discord.com/developers/applications" target="_blank" style="color:var(--accent);">Discord Developer Portal</a> 创建 Bot，开启 Message Content Intent 和 Server Members Intent。</p>
+              <div class="grid">
+                <div class="field" style="grid-column:1 / -1;">
+                  <label>DISCORD_BOT_TOKEN</label>
+                  <input id="DISCORD_BOT_TOKEN" type="password" value="${esc(c.DISCORD_BOT_TOKEN || "")}" placeholder="Bot Token" />
+                </div>
+                <div class="field">
+                  <label>DISCORD_GUILD_ID (服务器 ID)</label>
+                  <input id="DISCORD_GUILD_ID" value="${esc(c.DISCORD_GUILD_ID || "")}" placeholder="右键服务器 → 复制 ID" />
+                </div>
+                <div class="field">
+                  <label>DISCORD_CHANNEL_ID (频道 ID)</label>
+                  <input id="DISCORD_CHANNEL_ID" value="${esc(c.DISCORD_CHANNEL_ID || "")}" placeholder="右键频道 → 复制 ID" />
                 </div>
               </div>
             </article>

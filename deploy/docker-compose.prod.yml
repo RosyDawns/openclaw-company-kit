@@ -19,13 +19,14 @@ services:
       retries: 3
 
   dashboard:
-    image: node:22-slim
+    image: python:3.12-slim
     restart: unless-stopped
     env_file: ../.env
     working_dir: /app
     volumes:
       - ..:/app:ro
-    command: npx wrangler pages dev dashboard --port 8788 --no-bundle
+      - openclaw-data:/root/.openclaw-${OPENCLAW_PROFILE:-company}
+    command: python3 scripts/control_server.py --port 8788
     ports:
       - "127.0.0.1:${DASHBOARD_PORT:-8788}:8788"
 

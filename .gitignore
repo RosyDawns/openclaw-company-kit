@@ -1,17 +1,38 @@
+# Secrets & env
 .env
 .env.local
+.env.*.local
+
+# Logs & PID
 *.log
 *.pid
+
+# Temp & build
 .tmp/
 .dist/
+node_modules/
 
 # macOS
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Python
 __pycache__/
 *.pyc
 .pytest_cache/
+.coverage
+htmlcov/
+
+# RIPER-5 workspace (local session data)
+project_document/
+*.bak
 
 # Runtime cache
 data/

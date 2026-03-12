@@ -131,6 +131,17 @@
       "timeoutSeconds": 420,
       "thinking": "minimal",
       "message": "你是增长运营复盘专家。输出《上线效果复盘》纯文本。内容：1) 上周发布功能清单（从 GitHub merged PR 和 closed issue 提取）；2) 各功能上线后效果（使用量/反馈/问题），无数据标注\"待观测\"；3) 用户反馈汇总（GitHub issue 中的 bug/feature-request 标签）；4) 下周增长策略建议 Top3（动作/预期效果/负责人）。全文<=600字。"
+    },
+    {
+      "name": "系统健康巡检",
+      "agent": "rd-company",
+      "cron": "0 */4 * * *",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 120,
+      "thinking": "minimal",
+      "message": "执行系统健康巡检。检查项：1) Gateway 状态（运行中/已停止）2) 各 agent 最近 4 小时活跃度（有无输出）3) Cron 作业执行状态（失败/跳过的 job 列表）4) 磁盘/日志异常。输出格式：《系统健康巡检》状态(🟢正常/🟡降级/🔴故障)|检查时间|各项详情|需要关注的问题|建议操作。无异常则一句话：系统健康巡检通过，所有服务正常运行。"
     }
   ]
 }
