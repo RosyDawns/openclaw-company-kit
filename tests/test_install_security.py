@@ -30,6 +30,8 @@ class InstallSecurityTests(unittest.TestCase):
         content = (ROOT / "scripts" / "onboard-wrapper.sh").read_text(encoding="utf-8")
         self.assertIn("sanitize_legacy_config()", content)
         self.assertIn("del(.maxSpawnDepth)", content)
+        self.assertIn("restore_gateway_auth_token_if_changed()", content)
+        self.assertIn("restored existing gateway auth token", content)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,46 @@ sanitize_legacy_config() {
   fi
 }
 
+read_gateway_auth_token() {
+  local cfg_path="$1"
+  [ -f "${cfg_path}" ] || {
+    printf '\n'
+    return 0
+  }
+  command -v jq >/dev/null 2>&1 || {
+    printf '\n'
+    return 0
+  }
+  jq -r '.gateway.auth.token // ""' "${cfg_path}" 2>/dev/null || printf '\n'
+}
+
+restore_gateway_auth_token_if_changed() {
+  local cfg_path="$1"
+  local expected_token="$2"
+  local current_token tmp_cfg
+
+  [ -n "${expected_token}" ] || return 0
+  [ -f "${cfg_path}" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  current_token="$(read_gateway_auth_token "${cfg_path}")"
+  if [ -z "${current_token}" ] || [ "${current_token}" = "${expected_token}" ]; then
+    return 0
+  fi
+
+  tmp_cfg="$(mktemp)"
+  if jq --arg token "${expected_token}" '
+      (.gateway //= {}) |
+      (.gateway.auth //= {}) |
+      .gateway.auth.token = $token
+    ' "${cfg_path}" > "${tmp_cfg}"; then
+    mv "${tmp_cfg}" "${cfg_path}"
+    echo "[onboard] restored existing gateway auth token to avoid Control UI invalidation"
+  else
+    rm -f "${tmp_cfg}" >/dev/null 2>&1 || true
+  fi
+}
+
 ONBOARD_FLAGS=()
 CUSTOM_BASE_URL_INPUT="${CUSTOM_BASE_URL:-}"
 if [ -n "${CUSTOM_BASE_URL_INPUT}" ]; then
@@ -55,15 +95,23 @@ fi
 if [ -f "${TARGET_CONFIG}" ]; then
   sanitize_legacy_config "${TARGET_CONFIG}"
   if [ -n "${CUSTOM_API_KEY:-}" ] && [ -n "${CUSTOM_BASE_URL:-}" ]; then
+    old_gateway_token="$(read_gateway_auth_token "${TARGET_CONFIG}")"
+    onboard_ok=1
     echo "[onboard] config exists, updating custom provider credentials..."
-    ocp onboard \
+    if ! ocp onboard \
       --non-interactive --accept-risk \
       --mode local --flow quickstart \
       --skip-channels --skip-skills --skip-ui --skip-daemon --skip-health \
       --workspace "${PROFILE_DIR}/workspace" \
-      "${ONBOARD_FLAGS[@]}" || {
-        echo "[onboard] WARN: credential update failed, continuing with existing config" >&2
-      }
+      "${ONBOARD_FLAGS[@]}"; then
+      onboard_ok=0
+      echo "[onboard] WARN: credential update failed, continuing with existing config" >&2
+    fi
+    restore_gateway_auth_token_if_changed "${TARGET_CONFIG}" "${old_gateway_token}"
+    if [ "${onboard_ok}" -eq 0 ]; then
+      echo "[onboard] OK"
+      exit 0
+    fi
     echo "[onboard] OK"
     exit 0
   fi
