@@ -12,6 +12,7 @@ class InstallSecurityTests(unittest.TestCase):
         self.assertIn("--argjson allowFrom", content)
         self.assertNotIn('"allowFrom": ["*"]', content)
         self.assertIn('"allowFrom": $allowFrom', content)
+        self.assertIn('"groupAllowFrom": $allowFrom', content)
         self.assertIn('"dmPolicy": "allowlist"', content)
         self.assertIn('"groupPolicy": "allowlist"', content)
 

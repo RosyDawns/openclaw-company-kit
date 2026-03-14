@@ -3,7 +3,7 @@
     {
       "name": "模板-流程-晨会",
       "agent": "role-tech-director",
-      "cron": "30 16 * * 1-5",
+      "cron": "30 16 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -14,7 +14,7 @@
     {
       "name": "模板-流程-同步",
       "agent": "rd-company",
-      "cron": "45 20 * * 1-5",
+      "cron": "45 20 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",

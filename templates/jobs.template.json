@@ -14,7 +14,7 @@
     {
       "name": "研发晨会",
       "agent": "rd-company",
-      "cron": "30 9 * * 1-5",
+      "cron": "30 9 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -25,7 +25,7 @@
     {
       "name": "研发午间同步",
       "agent": "rd-company",
-      "cron": "30 13 * * 1-5",
+      "cron": "30 13 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -36,7 +36,7 @@
     {
       "name": "研发晚间复盘",
       "agent": "rd-company",
-      "cron": "30 20 * * 1-5",
+      "cron": "30 20 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -58,7 +58,7 @@
     {
       "name": "角色进度同步-产品经理",
       "agent": "role-product",
-      "cron": "2,32 8-22 * * 1-5",
+      "cron": "2,32 8-22 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -69,7 +69,7 @@
     {
       "name": "角色进度同步-技术总监",
       "agent": "role-tech-director",
-      "cron": "4,34 8-22 * * 1-5",
+      "cron": "4,34 8-22 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -80,7 +80,7 @@
     {
       "name": "角色进度同步-代码Reviewer",
       "agent": "role-code-reviewer",
-      "cron": "6,36 8-22 * * 1-5",
+      "cron": "6,36 8-22 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -91,7 +91,7 @@
     {
       "name": "角色进度同步-测试工程师",
       "agent": "role-qa-test",
-      "cron": "9,39 8-22 * * 1-5",
+      "cron": "9,39 8-22 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -102,7 +102,7 @@
     {
       "name": "代码执行-高级程序员",
       "agent": "role-senior-dev",
-      "cron": "*/30 8-22 * * 1-5",
+      "cron": "*/30 8-22 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
@@ -113,7 +113,7 @@
     {
       "name": "每日转化分析-增长运营",
       "agent": "role-growth",
-      "cron": "0 18 * * 1-5",
+      "cron": "0 18 * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",
       "to": "__GROUP_ID__",
