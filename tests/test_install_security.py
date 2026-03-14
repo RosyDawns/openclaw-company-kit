@@ -33,6 +33,11 @@ class InstallSecurityTests(unittest.TestCase):
         self.assertIn("restore_gateway_auth_token_if_changed()", content)
         self.assertIn("restored existing gateway auth token", content)
 
+    def test_install_removes_stale_ai_feishu_account_when_disabled(self):
+        content = (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8")
+        self.assertIn('if $aiAppId != "" and $aiAppSecret != "" then', content)
+        self.assertIn("del(.[$aiAccount])", content)
+
 
 if __name__ == "__main__":
     unittest.main()

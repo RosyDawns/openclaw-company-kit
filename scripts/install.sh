@@ -339,37 +339,43 @@ jq \
   .channels = (.channels // {}) |
   .channels.feishu = ((.channels.feishu // {}) + {"enabled":true,"domain":"feishu"}) |
   .channels.feishu.accounts = (
-    (.channels.feishu.accounts // {})
-    + {
-      ($hotAccount): {
-        "enabled": true,
-        "appId": $hotAppId,
-        "appSecret": $hotAppSecret,
-        "botName": $hotBotName,
-        "dmPolicy": "allowlist",
-        "groupPolicy": "allowlist",
-        "allowFrom": $allowFrom,
-        "groupAllowFrom": $allowFrom
-      },
-      "default": {
-        "groupPolicy": "allowlist",
-        "dmPolicy": "allowlist",
-        "allowFrom": $allowFrom,
-        "groupAllowFrom": $allowFrom
+    (
+      (.channels.feishu.accounts // {})
+      + {
+        ($hotAccount): {
+          "enabled": true,
+          "appId": $hotAppId,
+          "appSecret": $hotAppSecret,
+          "botName": $hotBotName,
+          "dmPolicy": "allowlist",
+          "groupPolicy": "allowlist",
+          "allowFrom": $allowFrom,
+          "groupAllowFrom": $allowFrom
+        },
+        "default": {
+          "groupPolicy": "allowlist",
+          "dmPolicy": "allowlist",
+          "allowFrom": $allowFrom,
+          "groupAllowFrom": $allowFrom
+        }
       }
-    }
-    + (if $aiAppId != "" and $aiAppSecret != "" then {
-      ($aiAccount): {
-        "enabled": true,
-        "appId": $aiAppId,
-        "appSecret": $aiAppSecret,
-        "botName": $aiBotName,
-        "dmPolicy": "allowlist",
-        "groupPolicy": "allowlist",
-        "allowFrom": $allowFrom,
-        "groupAllowFrom": $allowFrom
-      }
-    } else {} end)
+    )
+    | if $aiAppId != "" and $aiAppSecret != "" then
+        . + {
+          ($aiAccount): {
+            "enabled": true,
+            "appId": $aiAppId,
+            "appSecret": $aiAppSecret,
+            "botName": $aiBotName,
+            "dmPolicy": "allowlist",
+            "groupPolicy": "allowlist",
+            "allowFrom": $allowFrom,
+            "groupAllowFrom": $allowFrom
+          }
+        }
+      else
+        del(.[$aiAccount])
+      end
   ) |
   .channels.feishu.groups = ((.channels.feishu.groups // {}) + {
     ($groupId): {
