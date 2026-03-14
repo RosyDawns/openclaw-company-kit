@@ -121,6 +121,48 @@ rollback_install() {
   exit "${exit_code}"
 }
 
+warn_profile_model_base_urls() {
+  local config_path="$1"
+  local provider base_url
+
+  [ -f "${config_path}" ] || return 0
+
+  while IFS=$'\t' read -r provider base_url; do
+    [ -n "${base_url}" ] || continue
+    warn_model_base_url "${base_url}" "${provider}" "install.profile"
+  done < <(
+    jq -r '
+      (.models.providers // {})
+      | to_entries[]
+      | select((.value | type) == "object")
+      | "\(.key)\t\(.value.baseUrl // "")"
+    ' "${config_path}" 2>/dev/null || true
+  )
+}
+
+warn_agent_model_base_urls() {
+  local agents_root="$1"
+  local model_file provider base_url agent_id
+
+  [ -d "${agents_root}" ] || return 0
+
+  while IFS= read -r model_file; do
+    [ -f "${model_file}" ] || continue
+    agent_id="$(basename "$(dirname "$(dirname "${model_file}")")")"
+    while IFS=$'\t' read -r provider base_url; do
+      [ -n "${base_url}" ] || continue
+      warn_model_base_url "${base_url}" "${provider}" "install.agent:${agent_id}"
+    done < <(
+      jq -r '
+        (.providers // {})
+        | to_entries[]
+        | select((.value | type) == "object")
+        | "\(.key)\t\(.value.baseUrl // "")"
+      ' "${model_file}" 2>/dev/null || true
+    )
+  done < <(find "${agents_root}" -type f -path '*/agent/models.json' | sort)
+}
+
 backup_file_if_exists "${PROFILE_DIR}/openclaw.json"
 backup_file_if_exists "${PROFILE_DIR}/exec-approvals.json"
 backup_file_if_exists "${SHARED_CONTEXT_DIR}/priorities.md"
@@ -306,12 +348,14 @@ jq \
         "botName": $hotBotName,
         "dmPolicy": "allowlist",
         "groupPolicy": "allowlist",
-        "allowFrom": $allowFrom
+        "allowFrom": $allowFrom,
+        "groupAllowFrom": $allowFrom
       },
       "default": {
         "groupPolicy": "allowlist",
         "dmPolicy": "allowlist",
-        "allowFrom": $allowFrom
+        "allowFrom": $allowFrom,
+        "groupAllowFrom": $allowFrom
       }
     }
     + (if $aiAppId != "" and $aiAppSecret != "" then {
@@ -322,7 +366,8 @@ jq \
         "botName": $aiBotName,
         "dmPolicy": "allowlist",
         "groupPolicy": "allowlist",
-        "allowFrom": $allowFrom
+        "allowFrom": $allowFrom,
+        "groupAllowFrom": $allowFrom
       }
     } else {} end)
   ) |
@@ -359,6 +404,9 @@ jq \
   ' "${PROFILE_DIR}/openclaw.json" > "${tmp_cfg}"
 
 mv "${tmp_cfg}" "${PROFILE_DIR}/openclaw.json"
+
+warn_profile_model_base_urls "${PROFILE_DIR}/openclaw.json"
+warn_agent_model_base_urls "${TARGET_AGENTS_DIR}"
 
 # Deploy exec-approvals (command-level allowlist)
 EXEC_APPROVALS_TEMPLATE="${ROOT_DIR}/templates/exec-approvals.template.json"

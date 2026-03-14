@@ -140,6 +140,28 @@ expand_tilde_path() {
   esac
 }
 
+warn_model_base_url() {
+  local raw="${1:-}"
+  local provider_id="${2:-unknown}"
+  local source="${3:-config}"
+  local trimmed
+
+  trimmed="${raw#"${raw%%[![:space:]]*}"}"
+  trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+  [ -n "${trimmed}" ] || return 0
+
+  if [[ ! "${trimmed}" =~ ^https?:// ]]; then
+    echo "[WARN] ${source}: provider=${provider_id} baseUrl may be invalid (expected http(s) URL): ${trimmed}" >&2
+    return 0
+  fi
+
+  # Known pitfall: vendor docs may require /v1 suffix while users only configure domain root.
+  if [[ "${trimmed%/}" =~ ^https?://([^/]+\.)?heiyucode\.com$ ]]; then
+    echo "[WARN] ${source}: provider=${provider_id} baseUrl may be incomplete: ${trimmed}" >&2
+    echo "[WARN] hint: try https://www.heiyucode.com/v1" >&2
+  fi
+}
+
 now_local() {
   date '+%Y-%m-%d %H:%M:%S'
 }

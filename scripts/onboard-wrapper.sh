@@ -40,8 +40,10 @@ sanitize_legacy_config() {
 }
 
 ONBOARD_FLAGS=()
-if [ -n "${CUSTOM_BASE_URL:-}" ]; then
-  ONBOARD_FLAGS+=(--custom-base-url "${CUSTOM_BASE_URL}")
+CUSTOM_BASE_URL_INPUT="${CUSTOM_BASE_URL:-}"
+if [ -n "${CUSTOM_BASE_URL_INPUT}" ]; then
+  warn_model_base_url "${CUSTOM_BASE_URL_INPUT}" "${CUSTOM_PROVIDER_ID:-custom}" "onboard"
+  ONBOARD_FLAGS+=(--custom-base-url "${CUSTOM_BASE_URL_INPUT}")
   ONBOARD_FLAGS+=(--custom-model-id "${CUSTOM_MODEL_ID}")
   ONBOARD_FLAGS+=(--custom-provider-id "${CUSTOM_PROVIDER_ID}")
   [ -n "${CUSTOM_COMPATIBILITY:-}" ] && ONBOARD_FLAGS+=(--custom-compatibility "${CUSTOM_COMPATIBILITY}")
