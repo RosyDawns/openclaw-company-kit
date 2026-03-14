@@ -40,6 +40,8 @@ fi
 echo "[restore] source: ${ARCHIVE}"
 echo "[restore] profile: ${OPENCLAW_PROFILE}"
 
+mkdir -p "${PROFILE_DIR}/run"
+
 if [ -f "${RESTORE_DIR}/openclaw.json" ]; then
   cp "${RESTORE_DIR}/openclaw.json" "${PROFILE_DIR}/openclaw.json"
   echo "[restore] ✓ openclaw.json"
@@ -64,6 +66,16 @@ fi
 if [ -f "${RESTORE_DIR}/dot-env" ]; then
   cp "${RESTORE_DIR}/dot-env" "${ROOT_DIR}/.env"
   echo "[restore] ✓ .env"
+fi
+
+if [ -f "${RESTORE_DIR}/control-task-history.jsonl" ]; then
+  cp "${RESTORE_DIR}/control-task-history.jsonl" "${PROFILE_DIR}/run/control-task-history.jsonl"
+  echo "[restore] ✓ control-task-history.jsonl"
+fi
+
+if [ -f "${RESTORE_DIR}/control-audit-log.jsonl" ]; then
+  cp "${RESTORE_DIR}/control-audit-log.jsonl" "${PROFILE_DIR}/run/control-audit-log.jsonl"
+  echo "[restore] ✓ control-audit-log.jsonl"
 fi
 
 echo "[OK] restore complete — run 'bash scripts/start.sh' to apply"

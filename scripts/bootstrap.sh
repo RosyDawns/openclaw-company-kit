@@ -305,7 +305,11 @@ main() {
 
   local_cfg="$(openclaw config file 2>/dev/null || true)"
   if [ -n "${local_cfg}" ]; then
-    eval "local_cfg=${local_cfg}"
+    if [[ "${local_cfg}" == "~" ]]; then
+      local_cfg="${HOME}"
+    elif [[ "${local_cfg}" == "~/"* ]]; then
+      local_cfg="${HOME}/${local_cfg#\~/}"
+    fi
   fi
   if [ -n "${local_cfg}" ] && [ -f "${local_cfg}" ]; then
     default_group_id="$(jq -r '.bindings[]? | select(.agentId=="rd-company" and .match.channel=="feishu") | .match.peer.id // empty' "${local_cfg}" | head -n1 || true)"

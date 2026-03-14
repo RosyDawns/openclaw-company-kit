@@ -1,0 +1,37 @@
+{
+  "jobs": [
+    {
+      "name": "模板-流程-晨会",
+      "agent": "rd-company",
+      "cron": "15 10 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "你是需求评审主持人。围绕项目 __PROJECT_NAME__（__PROJECT_REPO__）输出《需求评审晨会》：目标、范围、验收标准、负责人、截止时间。必须附证据锚点；无证据仅可 todo/blocked。"
+    },
+    {
+      "name": "模板-流程-同步",
+      "agent": "rd-company",
+      "cron": "30 14 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《需求会审》：产品经理、技术总监、高级程序员各给 1 个可执行方案，含成本/风险/收益。输出统一结论、取舍理由、决策人、最晚决策时间。"
+    },
+    {
+      "name": "模板-流程-复盘",
+      "agent": "rd-company",
+      "cron": "40 20 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "输出《需求评审结论复盘》：今日评审通过项、驳回项、待补证据项、明日动作Top3（负责人/截止/验证方式）。"
+    }
+  ]
+}

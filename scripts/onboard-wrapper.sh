@@ -8,6 +8,37 @@ load_env
 
 TARGET_CONFIG="${PROFILE_DIR}/openclaw.json"
 
+sanitize_legacy_config() {
+  local cfg_path="$1"
+  [ -f "${cfg_path}" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local tmp_cfg
+  tmp_cfg="$(mktemp)"
+  if jq '
+      if (.agents.list | type) == "array" then
+        .agents.list |= map(
+          if (.subagents | type) == "object" then
+            .subagents |= del(.maxSpawnDepth)
+          else
+            .
+          end
+        )
+      else
+        .
+      end
+    ' "${cfg_path}" > "${tmp_cfg}"; then
+    if ! cmp -s "${cfg_path}" "${tmp_cfg}"; then
+      mv "${tmp_cfg}" "${cfg_path}"
+      echo "[onboard] removed deprecated subagents.maxSpawnDepth from existing config"
+    else
+      rm -f "${tmp_cfg}" >/dev/null 2>&1 || true
+    fi
+  else
+    rm -f "${tmp_cfg}" >/dev/null 2>&1 || true
+  fi
+}
+
 ONBOARD_FLAGS=()
 if [ -n "${CUSTOM_BASE_URL:-}" ]; then
   ONBOARD_FLAGS+=(--custom-base-url "${CUSTOM_BASE_URL}")
@@ -20,6 +51,7 @@ if [ -n "${CUSTOM_BASE_URL:-}" ]; then
 fi
 
 if [ -f "${TARGET_CONFIG}" ]; then
+  sanitize_legacy_config "${TARGET_CONFIG}"
   if [ -n "${CUSTOM_API_KEY:-}" ] && [ -n "${CUSTOM_BASE_URL:-}" ]; then
     echo "[onboard] config exists, updating custom provider credentials..."
     ocp onboard \

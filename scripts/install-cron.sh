@@ -16,6 +16,27 @@ if [ ! -f "${TEMPLATE_PATH}" ]; then
   exit 1
 fi
 
+WORKFLOW_TEMPLATE_ID="default"
+WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.default.json"
+case "$(printf '%s' "${WORKFLOW_TEMPLATE:-default}" | tr '[:upper:]' '[:lower:]')" in
+  requirement-review|requirement_review|review)
+    WORKFLOW_TEMPLATE_ID="requirement-review"
+    WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.requirement-review.json"
+    ;;
+  bugfix|bug-fix|bug_fix)
+    WORKFLOW_TEMPLATE_ID="bugfix"
+    WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.bugfix.json"
+    ;;
+  release-retro|release_retro|retro|postmortem)
+    WORKFLOW_TEMPLATE_ID="release-retro"
+    WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.release-retro.json"
+    ;;
+esac
+if [ ! -f "${WORKFLOW_JOBS_TEMPLATE}" ]; then
+  echo "[ERROR] workflow jobs template not found: ${WORKFLOW_JOBS_TEMPLATE}" >&2
+  exit 1
+fi
+
 jobs_json="$(
   sed \
     -e "s|__GROUP_ID__|${GROUP_ID}|g" \
@@ -30,6 +51,26 @@ if ! printf '%s' "${jobs_json}" | jq -e . >/dev/null; then
   echo "[ERROR] rendered jobs template is invalid JSON" >&2
   exit 1
 fi
+
+workflow_jobs_json="$(
+  sed \
+    -e "s|__GROUP_ID__|${GROUP_ID}|g" \
+    -e "s|__HOT_ACCOUNT__|${FEISHU_HOT_ACCOUNT_ID}|g" \
+    -e "s|__PROJECT_REPO__|${PROJECT_REPO}|g" \
+    -e "s|__PROJECT_PATH__|${PROJECT_PATH}|g" \
+    -e "s|__PROJECT_NAME__|${COMPANY_NAME}|g" \
+    "${WORKFLOW_JOBS_TEMPLATE}"
+)"
+if ! printf '%s' "${workflow_jobs_json}" | jq -e . >/dev/null; then
+  echo "[ERROR] rendered workflow jobs template is invalid JSON" >&2
+  exit 1
+fi
+
+jobs_json="$(
+  printf '%s' "${jobs_json}" | jq --argjson workflow "${workflow_jobs_json}" '
+    .jobs = ([.jobs[] | select((.name | startswith("模板-")) | not)] + ($workflow.jobs // []))
+  '
+)"
 
 existing_jobs="$(ocp cron list --all --json)"
 
@@ -90,4 +131,5 @@ while IFS= read -r row; do
   upsert_job "$(printf '%s' "${row}" | base64 --decode)"
 done < <(printf '%s' "${jobs_json}" | jq -r '.jobs[] | @base64')
 
+echo "[cron] workflow template: ${WORKFLOW_TEMPLATE_ID}"
 echo "[OK] cron jobs synced for profile: ${OPENCLAW_PROFILE}"

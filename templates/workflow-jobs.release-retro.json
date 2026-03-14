@@ -1,0 +1,37 @@
+{
+  "jobs": [
+    {
+      "name": "模板-流程-晨会",
+      "agent": "role-tech-director",
+      "cron": "30 16 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《发布前检查》：版本范围、风险、回滚方案、发布窗口、责任人。缺少关键信息必须阻塞发布。"
+    },
+    {
+      "name": "模板-流程-同步",
+      "agent": "rd-company",
+      "cron": "45 20 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "输出《发布后复盘》：目标达成度、异常事件、用户反馈、技术债、改进动作（负责人/截止/验收）。"
+    },
+    {
+      "name": "模板-流程-复盘",
+      "agent": "role-growth",
+      "cron": "30 11 * * 3",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《发布增长复盘》：本次发布对转化漏斗影响、关键指标变化、下周优化动作Top3。无真实数据需标注“待接入数据”。"
+    }
+  ]
+}

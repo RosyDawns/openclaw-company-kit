@@ -510,6 +510,50 @@
           .replaceAll("'", "&#39;");
       }
 
+      const BLOCKED_TAGS = new Set(["script", "iframe", "object", "embed", "meta", "base", "link"]);
+      const URL_ATTRS = new Set(["href", "src", "xlink:href", "formaction"]);
+
+      function isSafeUrl(url) {
+        const raw = String(url || "").trim();
+        if (!raw) return true;
+        if (raw.startsWith("#") || raw.startsWith("/") || raw.startsWith("./") || raw.startsWith("../")) return true;
+        try {
+          const parsed = new URL(raw, location.href);
+          return ["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol);
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function sanitizeFragment(fragment) {
+        fragment.querySelectorAll("*").forEach((node) => {
+          const tag = node.tagName.toLowerCase();
+          if (BLOCKED_TAGS.has(tag)) {
+            node.remove();
+            return;
+          }
+          Array.from(node.attributes).forEach((attr) => {
+            const name = attr.name.toLowerCase();
+            const value = attr.value;
+            if (name.startsWith("on") || name === "srcdoc") {
+              node.removeAttribute(attr.name);
+              return;
+            }
+            if (URL_ATTRS.has(name) && !isSafeUrl(value)) {
+              node.removeAttribute(attr.name);
+            }
+          });
+        });
+      }
+
+      function setSafeHTML(host, html) {
+        if (!host) return;
+        const template = document.createElement("template");
+        template.innerHTML = String(html || "");
+        sanitizeFragment(template.content);
+        host.replaceChildren(template.content);
+      }
+
       function n(v) {
         const x = Number(v);
         return Number.isFinite(x) ? x : 0;
@@ -573,6 +617,59 @@
         return `<span class="chip warn">${esc(status || "-")}</span>`;
       }
 
+      function parseLocalMs(text) {
+        const raw = String(text || "").trim();
+        if (!raw) return null;
+        const ms = new Date(raw.replace(" ", "T")).getTime();
+        return Number.isFinite(ms) ? ms : null;
+      }
+
+      function detectRuntimeHealth(data) {
+        const issues = [];
+        const slaMinutes = Math.max(1, n(data.sla?.dashboardDataMaxAgeMinutes || 15));
+        const generatedMs = parseLocalMs(data.generatedAt);
+        const ageMin = generatedMs === null ? null : Math.max(0, Math.floor((Date.now() - generatedMs) / 60000));
+
+        if (ageMin === null) {
+          issues.push({
+            category: "data_lag",
+            level: "warn",
+            summary: "dashboard-data 时间戳解析失败",
+            action: "检查 dashboard-data.json 的 generatedAt 格式并执行 refresh.sh",
+          });
+        } else if (ageMin > slaMinutes) {
+          issues.push({
+            category: "data_lag",
+            level: ageMin >= slaMinutes * 2 ? "err" : "warn",
+            summary: `dashboard-data 延迟 ${ageMin} 分钟（阈值 ${slaMinutes}）`,
+            action: "检查 dashboard-refresh-loop，手动执行 ./refresh.sh 验证链路",
+          });
+        }
+
+        const ghErrors = [data.github?.error, data.github?.timeline?.error].filter(Boolean).join(" | ");
+        const ghBudget = data.github?.apiBudget || {};
+        const ghRateLimited =
+          Boolean(ghBudget.degraded) ||
+          /rate limit|secondary rate limit|api rate limit exceeded/i.test(String(ghErrors || ""));
+        if (ghRateLimited) {
+          issues.push({
+            category: "github_rate_limit",
+            level: "warn",
+            summary: "GitHub 接口触发限流或预算降级",
+            action: "提高 OPENCLAW_GITHUB_TRACKER_CACHE_TTL_SEC 或 OPENCLAW_GITHUB_API_BUDGET，并等待限流窗口恢复",
+          });
+        }
+
+        return {
+          healthy: issues.length === 0,
+          issues,
+          ageMin,
+          slaMinutes,
+          ghRateLimited,
+          ghBudget,
+        };
+      }
+
       function roleTitle(id) {
         return ROLE_LABELS[id] || id;
       }
@@ -585,6 +682,7 @@
         if (viewId === "overview") {
           return [
             { id: "sec-flow", label: "执行链路" },
+            { id: "sec-ops", label: "执行质量" },
             { id: "sec-finance", label: "财务经营" },
             { id: "sec-radar", label: "项目情报" },
           ];
@@ -599,16 +697,23 @@
         return [
           { id: "sec-role-status", label: "角色状态" },
           { id: "sec-role-issues", label: "关联Issue" },
+          { id: "sec-role-evidence", label: "执行证据" },
           { id: "sec-role-timeline", label: "时间轴" },
         ];
       }
 
       function renderSubTabs() {
         const host = document.getElementById("subTabs");
+        if (!host) return;
         const tabs = currentSubTabs(state.currentView);
-        host.innerHTML = tabs
-          .map((t, idx) => `<button class="subtab ${idx === 0 ? "active" : ""}" data-target="${esc(t.id)}">${esc(t.label)}</button>`)
-          .join("");
+        host.replaceChildren();
+        tabs.forEach((t, idx) => {
+          const button = document.createElement("button");
+          button.className = `subtab ${idx === 0 ? "active" : ""}`.trim();
+          button.dataset.target = String(t.id || "");
+          button.textContent = String(t.label || "-");
+          host.appendChild(button);
+        });
       }
 
       function collectViews(data) {
@@ -638,22 +743,29 @@
 
       function renderTabs() {
         const host = document.getElementById("navTabs");
-        host.innerHTML = state.views
-          .map((v) => {
-            const active = v.id === state.currentView ? "active" : "";
-            return `<button class="tab ${active}" data-view="${esc(v.id)}">${esc(v.label)}</button>`;
-          })
-          .join("");
+        if (!host) return;
+        host.replaceChildren();
+        state.views.forEach((v) => {
+          const button = document.createElement("button");
+          const active = v.id === state.currentView ? "active" : "";
+          button.className = `tab ${active}`.trim();
+          button.dataset.view = String(v.id || "");
+          button.textContent = String(v.label || "-");
+          host.appendChild(button);
+        });
       }
 
       function setMetaLine(data) {
         const stats = issueStats(data);
         const company = data.company?.stats || {};
+        const ctl = data.controlTasks?.summary || {};
+        const ctlRate = n(ctl.successRate);
         const line = [
           `更新时间 ${data.generatedAt || "-"}`,
           `群 ${data.group?.id || "-"}`,
           `活跃智能体 ${n(company.activeAgents)}/${n(company.totalAgents)}`,
           `Open ${n(stats.open)} / Doing ${n(stats.doing)} / Blocked ${n(stats.blocked)}`,
+          `控制成功率 ${n(ctl.total) > 0 ? `${ctlRate}%` : "-"}`,
           `GitHub ${data.githubAuth?.ok ? "已连接" : "异常"}`,
         ].join(" ｜ ");
         document.getElementById("metaLine").textContent = line;
@@ -667,6 +779,11 @@
         const risks = data.risksBoard || [];
         const radar = data.businessRadar || {};
         const biz = data.businessMetrics || {};
+        const control = data.controlTasks || {};
+        const controlSummary = control.summary || {};
+        const controlDaily = control.daily || [];
+        const controlFailTop = control.failuresByTask || [];
+        const controlLatestFailures = control.latestFailures || [];
         const issueMap = issueUrlMap(data);
         const hasBiz = Object.keys(biz).length > 0;
         const bizSource = hasBiz ? (biz.isReal ? `真实数据 · ${biz.period || "当前周期"}` : `估算数据 · ${biz.source || "-"}`) : "未接入财务数据";
@@ -678,6 +795,9 @@
           ["Open Issue", n(stats.open), "待处理任务"],
           ["Blocked", n(stats.blocked), "阻塞风险"],
           ["Done", n(stats.done), "已完成"],
+          ["控制任务(7d)", n(controlSummary.total), "配置中心执行量"],
+          ["控制成功率", `${n(controlSummary.successRate)}%`, "近 7 天"],
+          ["平均执行时长", `${n(controlSummary.avgDurationSec)}s`, "近 7 天"],
         ];
 
         const blockerItems = [];
@@ -700,6 +820,66 @@
                 `
               )
               .join("")}
+          </section>
+
+          <section id="sec-ops" class="grid split" style="margin-top:12px;">
+            <article class="panel glass reveal">
+              <h2>控制面执行质量（近 7 天）</h2>
+              <div class="chips" style="margin-bottom:10px;">
+                <span class="chip ${n(controlSummary.total) > 0 ? "ok" : "warn"}">总任务 ${esc(n(controlSummary.total))}</span>
+                <span class="chip ok">成功 ${esc(n(controlSummary.success))}</span>
+                <span class="chip ${n(controlSummary.failed) > 0 ? "err" : "ok"}">失败 ${esc(n(controlSummary.failed))}</span>
+                <span class="chip">成功率 ${esc(n(controlSummary.successRate))}%</span>
+              </div>
+              <div class="card" style="margin-bottom:10px;">
+                <h3>失败分布 Top</h3>
+                ${
+                  controlFailTop.length
+                    ? `<ul class="list">${controlFailTop.map((x) => `<li>${esc(x.name || "-")} · ${esc(n(x.count))} 次</li>`).join("")}</ul>`
+                    : '<div class="empty">暂无失败记录</div>'
+                }
+              </div>
+              <div class="card">
+                <h3>最近失败</h3>
+                ${
+                  controlLatestFailures.length
+                    ? `<ul class="list">${controlLatestFailures
+                        .slice(0, 5)
+                        .map(
+                          (x) =>
+                            `<li><b>${esc(x.name || "-")}</b> · ${esc(x.finishedAt || "-")}<br /><span class="muted">步骤 ${
+                              esc(x.failedStep || "-")
+                            } / 退出码 ${esc(x.failedCode ?? "-")} / ${esc(x.error || "-")}</span></li>`
+                        )
+                        .join("")}</ul>`
+                    : '<div class="empty">暂无失败事件</div>'
+                }
+              </div>
+            </article>
+            <article class="panel glass reveal" style="animation-delay:70ms">
+              <h2>成功率趋势（按日）</h2>
+              ${
+                controlDaily.length
+                  ? controlDaily
+                      .map(
+                        (d) => `
+                          <div class="card" style="margin-bottom:8px;">
+                            <h3>${esc(d.day || "-")}</h3>
+                            <div class="chips" style="margin-bottom:8px;">
+                              <span class="chip">任务 ${esc(n(d.total))}</span>
+                              <span class="chip ok">成功 ${esc(n(d.success))}</span>
+                              <span class="chip ${n(d.failed) > 0 ? "err" : "ok"}">失败 ${esc(n(d.failed))}</span>
+                              <span class="chip">平均时长 ${esc(n(d.avgDurationSec))}s</span>
+                            </div>
+                            <div class="progress"><i style="width:${pct(d.successRate)}"></i></div>
+                            <div class="muted" style="margin-top:6px;">成功率 ${esc(n(d.successRate))}%</div>
+                          </div>
+                        `
+                      )
+                      .join("")
+                  : '<div class="empty">暂无趋势数据</div>'
+              }
+            </article>
           </section>
 
           <section id="sec-finance" class="grid triple" style="margin-top:12px;">
@@ -812,6 +992,8 @@
         const feed = deriveFeed(data);
         const sources = data.dataSources || {};
         const issueMap = issueUrlMap(data);
+        const health = detectRuntimeHealth(data);
+        const ghBudget = health.ghBudget || {};
 
         return `
           <section class="grid split">
@@ -866,7 +1048,35 @@
               .map(([k, v]) => `<span class="chip">${esc(k)}: ${esc(v || "-")}</span>`)
               .join("")}</div></article>
             <article class="panel glass reveal" style="animation-delay:60ms"><h2>项目链接</h2><ul class="list"><li>仓库：${esc(data.project?.repoSlug || "-")}</li><li>分支：${esc(data.project?.branch || "-")}</li><li>工作区改动：${esc(data.project?.dirtyFiles ?? "-")} 个</li></ul></article>
-            <article class="panel glass reveal" style="animation-delay:120ms"><h2>服务健康</h2><ul class="list"><li>GitHub：${data.githubAuth?.ok ? "已连接" : "异常"}</li><li>群路由：${esc(data.group?.routeAgent || "-")}</li><li>最新生成：${esc(data.generatedAt || "-")}</li></ul></article>
+            <article class="panel glass reveal" style="animation-delay:120ms">
+              <h2>服务健康</h2>
+              <div class="chips" style="margin-bottom:8px;">
+                <span class="chip ${health.healthy ? "ok" : "warn"}">${health.healthy ? "整体健康" : "存在降级"}</span>
+                <span class="chip">数据年龄 ${health.ageMin === null ? "-" : `${health.ageMin}m`}</span>
+                <span class="chip">SLA ${health.slaMinutes}m</span>
+                <span class="chip ${health.ghRateLimited ? "warn" : "ok"}">GitHub 预算 ${esc(n(ghBudget.used))}/${esc(n(ghBudget.limit))}</span>
+              </div>
+              <ul class="list">
+                <li>GitHub：${data.githubAuth?.ok ? "已连接" : "异常"}</li>
+                <li>群路由：${esc(data.group?.routeAgent || "-")}</li>
+                <li>最新生成：${esc(data.generatedAt || "-")}</li>
+              </ul>
+              <div class="card" style="margin-top:10px;">
+                <h3>失败分类</h3>
+                ${
+                  health.issues.length
+                    ? `<ul class="list">${health.issues
+                        .map(
+                          (x) =>
+                            `<li>${statusChip(x.level === "err" ? "err" : "warn")} ${esc(x.summary)}<br /><span class="muted">建议：${esc(
+                              x.action
+                            )}</span></li>`
+                        )
+                        .join("")}</ul>`
+                    : '<div class="empty">当前无降级分类</div>'
+                }
+              </div>
+            </article>
           </section>
         `;
       }
@@ -934,6 +1144,14 @@
           .slice(0, 12);
       }
 
+      function evidenceTypeChip(type) {
+        const t = String(type || "issue").toLowerCase();
+        if (t === "pr") return '<span class="chip ok">PR</span>';
+        if (t === "commit") return '<span class="chip warn">Commit</span>';
+        if (t === "comment") return '<span class="chip">Comment</span>';
+        return '<span class="chip">Issue</span>';
+      }
+
       function renderRoleView(data, roleId) {
         const agent = (data.agentPanel || []).find((x) => x.id === roleId);
         if (!agent) {
@@ -945,6 +1163,8 @@
         const cron = (data.cronJobs || []).filter((j) => j.agentId === roleId);
         const issueMap = issueUrlMap(data);
         const timeline = buildRoleTimeline(data, roleId, agent);
+        const evidenceChain = (agent.evidenceChain || []).slice(0, 12);
+        const evidenceStats = agent.evidenceStats || {};
 
         return `
           <section id="sec-role-status" class="grid role-hero">
@@ -970,6 +1190,13 @@
                   <li>近期备注：${esc(agent.recentNote || "-")}</li>
                   <li>所有者：${esc(agent.owner || "-")}</li>
                 </ul>
+                <div class="chips" style="margin-top:8px;">
+                  <span class="chip">证据总数 ${esc(n(evidenceStats.total))}</span>
+                  <span class="chip">Issue ${esc(n(evidenceStats.issue))}</span>
+                  <span class="chip ok">PR ${esc(n(evidenceStats.pr))}</span>
+                  <span class="chip warn">Commit ${esc(n(evidenceStats.commit))}</span>
+                  <span class="chip">Comment ${esc(n(evidenceStats.comment))}</span>
+                </div>
               </div>
             </article>
 
@@ -1052,6 +1279,27 @@
                     : '<div class="empty">暂无绑定调度任务</div>'
                 }
               </div>
+              <div id="sec-role-evidence" class="card" style="margin-bottom:10px;">
+                <h3>执行证据链</h3>
+                ${
+                  evidenceChain.length
+                    ? `<ul class="list">${evidenceChain
+                        .map(
+                          (e) => `
+                            <li>
+                              ${evidenceTypeChip(e.type)} <a href="${esc(e.url || "#")}" target="_blank" rel="noopener">${esc(e.summary || "证据记录")}</a> · ${esc(
+                                ago(e.at || "")
+                              )}
+                              <br /><span class="muted">Issue #${esc(e.issueNumber || "-")} · ${esc(e.issueTitle || "-")} · ${
+                                esc(e.at || "-")
+                              }</span>
+                            </li>
+                          `
+                        )
+                        .join("")}</ul>`
+                    : '<div class="empty">暂无可追溯证据链</div>'
+                }
+              </div>
               <div class="card">
                 <h3>动作建议</h3>
                 <ul class="list">
@@ -1074,7 +1322,7 @@
         else if (state.currentView === "runtime") html = renderRuntime(state.data);
         else html = renderRoleView(state.data, state.currentView);
 
-        host.innerHTML = html;
+        setSafeHTML(host, html);
       }
 
       function setView(viewId, syncHash = true) {
@@ -1106,7 +1354,14 @@
           const target = hashView || state.currentView || "overview";
           setView(target, false);
         } catch (err) {
-          document.getElementById("viewHost").innerHTML = `<article class="panel glass empty">加载失败：${esc(err.message || err)}</article>`;
+          const host = document.getElementById("viewHost");
+          if (host) {
+            host.replaceChildren();
+            const article = document.createElement("article");
+            article.className = "panel glass empty";
+            article.textContent = `加载失败：${String(err.message || err)}`;
+            host.appendChild(article);
+          }
         } finally {
           state.loading = false;
           if (btn) {

@@ -23,7 +23,7 @@ import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, unquote, urlparse
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT_DIR / "web"
@@ -36,6 +36,7 @@ DEFAULT_CONFIG = {
     "COMPANY_NAME": "OpenClaw Company",
     "PROJECT_PATH": "/path/to/your-project",
     "PROJECT_REPO": "your-org/your-repo",
+    "WORKFLOW_TEMPLATE": "default",
     "GROUP_ID": "",
     "FEISHU_HOT_ACCOUNT_ID": "hot-search",
     "FEISHU_HOT_BOT_NAME": "小龙虾 1 号",
@@ -65,6 +66,7 @@ ENV_KEY_ORDER = [
     "COMPANY_NAME",
     "PROJECT_PATH",
     "PROJECT_REPO",
+    "WORKFLOW_TEMPLATE",
     "GROUP_ID",
     "FEISHU_HOT_ACCOUNT_ID",
     "FEISHU_HOT_BOT_NAME",
@@ -91,12 +93,25 @@ ENV_KEY_ORDER = [
 TASK_MAX_LOG_LINES = 1200
 TASKS: dict[str, dict] = {}
 TASK_LOCK = threading.Lock()
+TASK_HISTORY_LOCK = threading.Lock()
+TASK_AUDIT_LOCK = threading.Lock()
 SERVER_PORT = 8788
 AUTH_TOKEN: str | None = None
+AUTH_TOKEN_EPHEMERAL = False
+AUTH_COOKIE_NAME = "openclaw_control_token"
+TASK_HISTORY_FILE = "control-task-history.jsonl"
+TASK_AUDIT_FILE = "control-audit-log.jsonl"
 
 
 def now_text() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+
+def resolve_auth_token(cli_token: str | None, env_token: str | None) -> tuple[str, bool]:
+    token = (cli_token or env_token or "").strip()
+    if token:
+        return token, False
+    return secrets.token_urlsafe(32), True
 
 
 def parse_env_file(path: Path) -> tuple[dict[str, str], list[str]]:
@@ -207,6 +222,56 @@ def profile_dir(config: dict[str, str]) -> Path:
     return Path.home() / f".openclaw-{profile}"
 
 
+def task_history_path(config: dict[str, str] | None = None) -> Path:
+    cfg = config or merged_config()
+    run_dir = profile_dir(cfg) / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir / TASK_HISTORY_FILE
+
+
+def task_audit_path(config: dict[str, str] | None = None) -> Path:
+    cfg = config or merged_config()
+    run_dir = profile_dir(cfg) / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir / TASK_AUDIT_FILE
+
+
+def extract_task_error(logs: list[str]) -> str | None:
+    for line in reversed(logs):
+        text = (line or "").strip()
+        if not text:
+            continue
+        if "[ERROR]" in text:
+            return text
+        if "Traceback" in text or "Exception" in text or "ERROR" in text:
+            return text
+        if text.startswith("[") or text.startswith("$ "):
+            continue
+        return text
+    return None
+
+
+def append_task_history(row: dict) -> None:
+    path = task_history_path()
+    payload = json.dumps(row, ensure_ascii=False)
+    with TASK_HISTORY_LOCK:
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(payload + "\n")
+
+
+def append_task_audit(row: dict) -> None:
+    path = task_audit_path()
+    payload = dict(row or {})
+    payload.setdefault("eventAt", now_text())
+    payload.setdefault("eventAtEpoch", round(time.time(), 3))
+    payload.setdefault("pid", os.getpid())
+    payload.setdefault("profile", merged_config().get("OPENCLAW_PROFILE", "company"))
+    line = json.dumps(payload, ensure_ascii=False)
+    with TASK_AUDIT_LOCK:
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+
+
 def resolved_dashboard_dir(config: dict[str, str]) -> Path:
     deployed = profile_dir(config) / "workspace" / "rd-dashboard"
     if deployed.is_dir():
@@ -303,21 +368,65 @@ def append_task_log(task_id: str, line: str) -> None:
             task["logs"] = task["logs"][-TASK_MAX_LOG_LINES:]
 
 
-def set_task_status(task_id: str, status: str) -> None:
+def set_task_status(task_id: str, status: str, *, failed_step: str | None = None, failed_code: int | None = None) -> None:
+    history_row: dict | None = None
+    audit_row: dict | None = None
     with TASK_LOCK:
         task = TASKS.get(task_id)
         if not task:
             return
         task["status"] = status
         if status in {"success", "failed"}:
+            finished_epoch = time.time()
             task["finishedAt"] = now_text()
+            task["finishedAtEpoch"] = finished_epoch
+            started_epoch = float(task.get("startedAtEpoch") or finished_epoch)
+            duration = max(0.0, round(finished_epoch - started_epoch, 3))
+            task["durationSec"] = duration
+            task["failedStep"] = failed_step
+            task["failedCode"] = failed_code
+            history_row = {
+                "id": task.get("id"),
+                "name": task.get("name"),
+                "status": status,
+                "startedAt": task.get("startedAt"),
+                "finishedAt": task.get("finishedAt"),
+                "durationSec": duration,
+                "failedStep": failed_step,
+                "failedCode": failed_code,
+                "error": extract_task_error(task.get("logs") or []),
+            }
+            audit_row = {
+                "event": "task_finished",
+                "taskId": task.get("id"),
+                "taskName": task.get("name"),
+                "status": status,
+                "durationSec": duration,
+                "failedStep": failed_step,
+                "failedCode": failed_code,
+                "error": history_row.get("error"),
+            }
+
+    if history_row is not None:
+        append_task_history(history_row)
+    if audit_row is not None:
+        append_task_audit(audit_row)
 
 
 def run_task(task_id: str, steps: list[tuple[str, list[str]]]) -> None:
     try:
         for step_name, cmd in steps:
+            step_started_epoch = time.time()
             append_task_log(task_id, f"[{now_text()}] STEP {step_name}")
             append_task_log(task_id, "$ " + " ".join(cmd))
+            append_task_audit(
+                {
+                    "event": "task_step_start",
+                    "taskId": task_id,
+                    "step": step_name,
+                    "cmd": list(cmd),
+                }
+            )
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(ROOT_DIR),
@@ -331,27 +440,63 @@ def run_task(task_id: str, steps: list[tuple[str, list[str]]]) -> None:
                 append_task_log(task_id, line.rstrip())
             code = proc.wait()
             append_task_log(task_id, f"[{now_text()}] EXIT {step_name}: {code}")
+            append_task_audit(
+                {
+                    "event": "task_step_exit",
+                    "taskId": task_id,
+                    "step": step_name,
+                    "cmd": list(cmd),
+                    "exitCode": code,
+                    "durationSec": max(0.0, round(time.time() - step_started_epoch, 3)),
+                }
+            )
             if code != 0:
-                set_task_status(task_id, "failed")
+                set_task_status(task_id, "failed", failed_step=step_name, failed_code=code)
                 return
         set_task_status(task_id, "success")
     except Exception as exc:  # pylint: disable=broad-except
         append_task_log(task_id, f"[ERROR] {exc}")
-        set_task_status(task_id, "failed")
+        append_task_audit(
+            {
+                "event": "task_exception",
+                "taskId": task_id,
+                "step": "runtime",
+                "error": str(exc),
+            }
+        )
+        set_task_status(task_id, "failed", failed_step="runtime", failed_code=-1)
 
 
 def create_task(name: str, steps: list[tuple[str, list[str]]]) -> dict:
     task_id = uuid.uuid4().hex[:10]
+    started_epoch = time.time()
     task = {
         "id": task_id,
         "name": name,
         "status": "running",
-        "startedAt": now_text(),
+        "startedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(started_epoch)),
+        "startedAtEpoch": started_epoch,
         "finishedAt": None,
+        "finishedAtEpoch": None,
+        "durationSec": None,
+        "failedStep": None,
+        "failedCode": None,
+        "steps": [x[0] for x in steps],
         "logs": [],
     }
     with TASK_LOCK:
         TASKS[task_id] = task
+
+    append_task_audit(
+        {
+            "event": "task_created",
+            "taskId": task_id,
+            "taskName": name,
+            "status": "running",
+            "steps": [x[0] for x in steps],
+            "stepCount": len(steps),
+        }
+    )
 
     thread = threading.Thread(target=run_task, args=(task_id, steps), daemon=True)
     thread.start()
@@ -369,6 +514,9 @@ def get_task(task_id: str) -> dict | None:
             "status": task["status"],
             "startedAt": task["startedAt"],
             "finishedAt": task["finishedAt"],
+            "durationSec": task.get("durationSec"),
+            "failedStep": task.get("failedStep"),
+            "failedCode": task.get("failedCode"),
             "logs": list(task["logs"]),
         }
 
@@ -399,13 +547,36 @@ class ControlHandler(BaseHTTPRequestHandler):
                 return hmac.compare_digest(password, AUTH_TOKEN)
             except Exception:
                 return False
+        cookie_token = self._read_cookie_token()
+        if cookie_token:
+            return hmac.compare_digest(cookie_token, AUTH_TOKEN)
         return False
+
+    def _read_cookie_token(self) -> str | None:
+        raw = self.headers.get("Cookie", "")
+        if not raw:
+            return None
+        for chunk in raw.split(";"):
+            item = chunk.strip()
+            if not item or "=" not in item:
+                continue
+            key, value = item.split("=", 1)
+            if key.strip() == AUTH_COOKIE_NAME:
+                return unquote(value.strip())
+        return None
+
+    def _maybe_set_auth_cookie(self) -> None:
+        if not AUTH_TOKEN:
+            return
+        val = quote(AUTH_TOKEN, safe="")
+        self.send_header("Set-Cookie", f"{AUTH_COOKIE_NAME}={val}; Path=/; SameSite=Strict")
 
     def _send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self._maybe_set_auth_cookie()
         self.end_headers()
         self.wfile.write(body)
 
@@ -414,12 +585,14 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self._maybe_set_auth_cookie()
         self.end_headers()
         self.wfile.write(body)
 
     def _redirect(self, location: str) -> None:
         self.send_response(HTTPStatus.FOUND)
         self.send_header("Location", location)
+        self._maybe_set_auth_cookie()
         self.end_headers()
 
     def _read_json(self) -> dict:
@@ -442,6 +615,7 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        self._maybe_set_auth_cookie()
         self.end_headers()
         self.wfile.write(body)
 
@@ -496,6 +670,11 @@ class ControlHandler(BaseHTTPRequestHandler):
                 "firstTime": first_time,
                 "service": collect_service_status(cfg),
                 "server": {"rootDir": str(ROOT_DIR)},
+                "auth": {
+                    "enabled": AUTH_TOKEN is not None,
+                    "ephemeral": AUTH_TOKEN_EPHEMERAL,
+                    "cookieName": AUTH_COOKIE_NAME,
+                },
             })
             return
 
@@ -595,15 +774,15 @@ class ControlHandler(BaseHTTPRequestHandler):
 def main() -> None:
     parser = argparse.ArgumentParser(description="OpenClaw Company Kit control server")
     parser.add_argument("--port", type=int, default=8788, help="Server port")
-    parser.add_argument("--token", type=str, default=None, help="Bearer token for API auth (omit to disable)")
+    parser.add_argument("--token", type=str, default=None, help="Bearer token for API auth (omit to auto-generate)")
     args = parser.parse_args()
 
     if args.port < 1 or args.port > 65535:
         raise SystemExit("port must be in [1, 65535]")
 
-    global SERVER_PORT, AUTH_TOKEN  # pylint: disable=global-statement
+    global SERVER_PORT, AUTH_TOKEN, AUTH_TOKEN_EPHEMERAL  # pylint: disable=global-statement
     SERVER_PORT = args.port
-    AUTH_TOKEN = args.token or os.environ.get("CONTROL_TOKEN")
+    AUTH_TOKEN, AUTH_TOKEN_EPHEMERAL = resolve_auth_token(args.token, os.environ.get("CONTROL_TOKEN"))
 
     WEB_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -611,8 +790,10 @@ def main() -> None:
     print(f"[control] root={ROOT_DIR}")
     print(f"[control] setup:     http://127.0.0.1:{args.port}/setup")
     print(f"[control] dashboard: http://127.0.0.1:{args.port}/dashboard/")
-    if AUTH_TOKEN:
-        print(f"[control] auth:      Bearer token enabled")
+    print(f"[control] auth:      Bearer token enabled")
+    if AUTH_TOKEN_EPHEMERAL:
+        print(f"[control] token:     {AUTH_TOKEN}")
+        print(f"[control] hint:      set CONTROL_TOKEN in .env (or --token) to keep token stable")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

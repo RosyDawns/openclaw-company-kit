@@ -1,20 +1,45 @@
 # Roadmap
 
-## Phase 1 - Installable Kit (done)
-- [x] One-command install for isolated OpenClaw profile
-- [x] Multi-role routing + cron templates
-- [x] Dashboard packaging + issue-sync integration
-- [x] Healthcheck/start/stop scripts
+## Version Channels
 
-## Phase 2 - Engineering Upgrade (in progress)
-- [x] Docker demo mode (no OpenClaw required)
-- [x] Docs set: getting started, architecture, deployment, troubleshooting
-- [x] Contribution/release templates
-- [x] Basic test suite + CI gates
-- [ ] Cross-platform launcher (macOS/Linux service units)
+### LTS（稳定通道）`v0.6.x`
+- 目标：生产可用、可运营、低变更风险。
+- 变更策略：只接收安全修复、稳定性修复、文档与测试补丁。
+- 代表能力：
+  - 控制面默认认证、注入风险修复、安装失败回滚。
+  - 任务成功率/失败分布可观测、健康检查分类与 SLA。
+  - 流程模板包、角色证据链、控制面审计日志与备份摘要。
 
-## Phase 3 - Productization
-- [ ] Built-in role plugin marketplace config
-- [ ] Optional API backend for dashboard history
-- [ ] Multi-project dashboard switcher
-- [ ] End-to-end smoke tests with mocked OpenClaw gateway
+### Latest（最新通道）`v0.7.x`
+- 目标：产品化扩展与功能迭代。
+- 变更策略：允许结构升级，必要时引入破坏性变更。
+- 代表方向：
+  - 多项目看板切换。
+  - 插件化流程/角色扩展。
+  - 更细粒度的审计与历史查询能力。
+
+## Release Rules
+
+- 任一破坏性变更必须在 `CHANGELOG.md` 标记为 `BREAKING`。
+- 每次版本发布必须给出升级路径和回滚路径。
+- `release-check.sh` 与 CI smoke 必须通过后才可发布。
+
+## Milestones
+
+### v0.6 LTS（已完成）
+- [x] 安全基线：shell/eval/shell=True 风险面收口。
+- [x] 运维基线：控制任务指标、SLA 分类、watchdog 自愈。
+- [x] 产品基线：流程模板化、配置中心安全渲染、证据链可追溯。
+- [x] 质量基线：smoke job + release-check + 回归测试覆盖。
+
+### v0.7 Latest（进行中）
+- [ ] 多项目 dashboard 视图与切换能力。
+- [ ] 历史数据归档与查询接口。
+- [ ] 跨平台服务编排（macOS/Linux service units）。
+- [ ] 更完整的发布分层（LTS/Latest 文档自动校验）。
+
+## Upgrade Flow
+
+1. 升级前先执行 `make backup`（建议开启 `BACKUP_INCLUDE_TASK_SUMMARY=1`）。
+2. 升级后执行 `make install && make start && make health && make check`。
+3. 遇到回归时用 `make restore ARCHIVE=...` 回滚。

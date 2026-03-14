@@ -232,6 +232,7 @@
       .banner { padding: 8px 10px; border-radius: 10px; font-size: 12px; text-align: center; margin-bottom: 10px; }
       .banner.first-time { background: rgba(86, 194, 255, 0.18); border: 1px solid rgba(86, 194, 255, 0.6); color: var(--accent); }
       .banner.edit-mode { background: rgba(55, 211, 153, 0.12); border: 1px solid rgba(55, 211, 153, 0.4); color: var(--ok); }
+      .banner.auth-temp { background: rgba(251, 191, 36, 0.14); border: 1px solid rgba(251, 191, 36, 0.45); color: var(--warn); }
 
       @media (max-width: 980px) {
         .wrap {
@@ -301,6 +302,7 @@
       const state = {
         stepIdx: 0,
         config: {},
+        auth: {},
         taskId: "",
         taskTimer: null,
         firstTime: false,
@@ -319,6 +321,50 @@
         return document.getElementById(id);
       }
 
+      const BLOCKED_TAGS = new Set(["script", "iframe", "object", "embed", "meta", "base", "link"]);
+      const URL_ATTRS = new Set(["href", "src", "xlink:href", "formaction"]);
+
+      function isSafeUrl(url) {
+        const raw = String(url || "").trim();
+        if (!raw) return true;
+        if (raw.startsWith("#") || raw.startsWith("/") || raw.startsWith("./") || raw.startsWith("../")) return true;
+        try {
+          const parsed = new URL(raw, location.href);
+          return ["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol);
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function sanitizeFragment(fragment) {
+        fragment.querySelectorAll("*").forEach((node) => {
+          const tag = node.tagName.toLowerCase();
+          if (BLOCKED_TAGS.has(tag)) {
+            node.remove();
+            return;
+          }
+          Array.from(node.attributes).forEach((attr) => {
+            const name = attr.name.toLowerCase();
+            const value = attr.value;
+            if (name.startsWith("on") || name === "srcdoc") {
+              node.removeAttribute(attr.name);
+              return;
+            }
+            if (URL_ATTRS.has(name) && !isSafeUrl(value)) {
+              node.removeAttribute(attr.name);
+            }
+          });
+        });
+      }
+
+      function setSafeHTML(host, html) {
+        if (!host) return;
+        const template = document.createElement("template");
+        template.innerHTML = String(html || "");
+        sanitizeFragment(template.content);
+        host.replaceChildren(template.content);
+      }
+
       function setStatus(text, kind = "") {
         const el = byId("globalStatus");
         el.textContent = text;
@@ -328,13 +374,29 @@
       function updateStepNav() {
         const bannerEl = byId("modeBanner");
         if (bannerEl) {
-          bannerEl.innerHTML = state.firstTime
-            ? '<div class="banner first-time">首次配置向导</div>'
-            : '<div class="banner edit-mode">编辑已有配置</div>';
+          bannerEl.replaceChildren();
+          const modeBanner = document.createElement("div");
+          modeBanner.className = `banner ${state.firstTime ? "first-time" : "edit-mode"}`;
+          modeBanner.textContent = state.firstTime ? "首次配置向导" : "编辑已有配置";
+          bannerEl.appendChild(modeBanner);
+          if (state.auth?.ephemeral) {
+            const authBanner = document.createElement("div");
+            authBanner.className = "banner auth-temp";
+            authBanner.textContent = "当前使用临时控制令牌，服务重启后会变化，建议在 .env 设置 CONTROL_TOKEN。";
+            bannerEl.appendChild(authBanner);
+          }
         }
-        byId("steps").innerHTML = steps
-          .map((s, idx) => `<div class="step ${idx === state.stepIdx ? "active" : ""}" data-idx="${idx}">${esc(s.label)}</div>`)
-          .join("");
+        const stepsHost = byId("steps");
+        if (stepsHost) {
+          stepsHost.replaceChildren();
+          steps.forEach((s, idx) => {
+            const item = document.createElement("div");
+            item.className = `step ${idx === state.stepIdx ? "active" : ""}`.trim();
+            item.dataset.idx = String(idx);
+            item.textContent = s.label;
+            stepsHost.appendChild(item);
+          });
+        }
         byId("headTitle").textContent = steps[state.stepIdx].label;
       }
 
@@ -356,6 +418,7 @@
           "COMPANY_NAME",
           "PROJECT_PATH",
           "PROJECT_REPO",
+          "WORKFLOW_TEMPLATE",
           "GROUP_ID",
           "FEISHU_HOT_ACCOUNT_ID",
           "FEISHU_HOT_BOT_NAME",
@@ -440,6 +503,16 @@
                 <div class="field">
                   <label>PROJECT_REPO</label>
                   <input id="PROJECT_REPO" value="${esc(c.PROJECT_REPO || "your-org/your-repo")}" />
+                </div>
+                <div class="field">
+                  <label>流程模板包 (WORKFLOW_TEMPLATE)</label>
+                  <select id="WORKFLOW_TEMPLATE">
+                    <option value="default" ${(c.WORKFLOW_TEMPLATE || "default") === "default" ? "selected" : ""}>默认综合流</option>
+                    <option value="requirement-review" ${(c.WORKFLOW_TEMPLATE || "default") === "requirement-review" ? "selected" : ""}>需求评审流</option>
+                    <option value="bugfix" ${(c.WORKFLOW_TEMPLATE || "default") === "bugfix" ? "selected" : ""}>Bug 修复流</option>
+                    <option value="release-retro" ${(c.WORKFLOW_TEMPLATE || "default") === "release-retro" ? "selected" : ""}>发布复盘流</option>
+                  </select>
+                  <div class="muted">会影响 cron 模板任务与群系统提示词，可随时切换后一键应用。</div>
                 </div>
                 <div class="field" style="grid-column:1 / -1;">
                   <label>PROJECT_PATH</label>
@@ -602,7 +675,7 @@
         };
 
         const key = steps[state.stepIdx].id;
-        byId("panel").innerHTML = panes[key] || "";
+        setSafeHTML(byId("panel"), panes[key] || "");
 
         if (key === "step-model") {
           const customFields = byId("customProviderFields");
@@ -694,14 +767,22 @@
             const el = byId("preflightResult");
             if (!el) return;
             const checks = pf.checks || [];
-            const lines = checks.map(c => {
+            const fragment = document.createDocumentFragment();
+            checks.forEach((c, idx) => {
+              if (idx > 0) fragment.appendChild(document.createTextNode(" \u00A0 "));
               const isWarn = !c.ok && c.blocking === false;
-              const icon = c.ok ? '<span style="color:var(--ok)">✓</span>' : isWarn ? '<span style="color:var(--warn)">⚠</span>' : '<span style="color:var(--err)">✗</span>';
-              const ver = c.version ? ` (${esc(c.version)})` : '';
-              const hint = isWarn ? ' (初始化时自动创建)' : '';
-              return `${icon} ${esc(c.name)}${ver}${hint}`;
+              const icon = document.createElement("span");
+              icon.style.color = c.ok ? "var(--ok)" : isWarn ? "var(--warn)" : "var(--err)";
+              icon.textContent = c.ok ? "✓" : isWarn ? "⚠" : "✗";
+              const ver = c.version ? ` (${String(c.version)})` : "";
+              const hint = isWarn ? " (初始化时自动创建)" : "";
+              fragment.appendChild(icon);
+              fragment.appendChild(document.createTextNode(` ${String(c.name || "-")}${ver}${hint}`));
             });
-            el.innerHTML = lines.join(' &nbsp; ');
+            if (checks.length === 0) {
+              fragment.appendChild(document.createTextNode("未返回预检项"));
+            }
+            el.replaceChildren(fragment);
           }).catch(() => {
             const el = byId("preflightResult");
             if (el) el.textContent = "环境检测失败";
@@ -714,10 +795,32 @@
         }
       }
 
+      function readCookie(name) {
+        const key = `${name}=`;
+        const rows = document.cookie ? document.cookie.split(";") : [];
+        for (const row of rows) {
+          const v = row.trim();
+          if (v.startsWith(key)) {
+            try {
+              return decodeURIComponent(v.slice(key.length));
+            } catch (_) {
+              return v.slice(key.length);
+            }
+          }
+        }
+        return "";
+      }
+
       async function api(path, opts = {}) {
+        const headers = { "content-type": "application/json" };
+        const cookieName = state.auth?.cookieName || "openclaw_control_token";
+        const token = readCookie(cookieName);
+        if (token) headers.authorization = `Bearer ${token}`;
+
         const res = await fetch(path, {
           method: opts.method || "GET",
-          headers: { "content-type": "application/json" },
+          headers,
+          credentials: "same-origin",
           body: opts.body ? JSON.stringify(opts.body) : undefined,
         });
         const data = await res.json().catch(() => ({}));
@@ -730,8 +833,10 @@
       async function loadConfig() {
         const data = await api("/api/config");
         state.config = data.config || {};
+        state.auth = data.auth || {};
         state.firstTime = data.firstTime ?? false;
-        setStatus("配置已加载", "ok");
+        updateStepNav();
+        setStatus(state.auth?.ephemeral ? "配置已加载（临时控制令牌）" : "配置已加载", state.auth?.ephemeral ? "warn" : "ok");
       }
 
       async function saveConfig() {
@@ -840,16 +945,35 @@
           const items = data.service?.services || [];
           const host = byId("serviceList");
           if (!host) return;
-          host.innerHTML = items
-            .map((s) => {
-              const tag = s.running ? '<span class="status ok">running</span>' : '<span class="status err">stopped</span>';
-              const pid = s.pid ? `PID ${s.pid}` : "PID -";
-              return `<div class="svc"><div><b>${esc(s.name)}</b> ${tag}</div><div class="muted">${esc(pid)}</div></div>`;
-            })
-            .join("");
+          host.replaceChildren();
+          items.forEach((s) => {
+            const row = document.createElement("div");
+            row.className = "svc";
+            const header = document.createElement("div");
+            const nameEl = document.createElement("b");
+            nameEl.textContent = String(s.name || "-");
+            const statusEl = document.createElement("span");
+            statusEl.className = `status ${s.running ? "ok" : "err"}`;
+            statusEl.textContent = s.running ? "running" : "stopped";
+            header.appendChild(nameEl);
+            header.appendChild(document.createTextNode(" "));
+            header.appendChild(statusEl);
+            const meta = document.createElement("div");
+            meta.className = "muted";
+            meta.textContent = s.pid ? `PID ${s.pid}` : "PID -";
+            row.appendChild(header);
+            row.appendChild(meta);
+            host.appendChild(row);
+          });
         } catch (err) {
           const host = byId("serviceList");
-          if (host) host.innerHTML = `<div class="svc">读取失败: ${esc(err.message)}</div>`;
+          if (host) {
+            host.replaceChildren();
+            const row = document.createElement("div");
+            row.className = "svc";
+            row.textContent = `读取失败: ${String(err.message || err)}`;
+            host.appendChild(row);
+          }
         }
       }
 

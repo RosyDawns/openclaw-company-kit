@@ -1,0 +1,37 @@
+{
+  "jobs": [
+    {
+      "name": "模板-流程-晨会",
+      "agent": "rd-company",
+      "cron": "15 10 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《通用流程晨会》：今日目标、角色分工、风险与验收标准，必须包含负责人/截止/证据。"
+    },
+    {
+      "name": "模板-流程-同步",
+      "agent": "rd-company",
+      "cron": "30 14 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《通用流程同步》：进展、阻塞、决策点、下半天动作 Top3。无证据项不得标记 done。"
+    },
+    {
+      "name": "模板-流程-复盘",
+      "agent": "rd-company",
+      "cron": "40 20 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《通用流程复盘》：完成项、未完成原因、明日优先级与改进动作（负责人/截止/验收）。"
+    }
+  ]
+}

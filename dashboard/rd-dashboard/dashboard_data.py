@@ -2,12 +2,27 @@
 import json
 import os
 import re
+import shlex
 import subprocess
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 from zoneinfo import ZoneInfo
+
+
+def read_env_int(name: str, default: int, minimum: Optional[int] = None, maximum: Optional[int] = None):
+    raw = os.environ.get(name)
+    try:
+        value = int(str(raw).strip()) if raw is not None else int(default)
+    except Exception:
+        value = int(default)
+    if minimum is not None and value < minimum:
+        value = minimum
+    if maximum is not None and value > maximum:
+        value = maximum
+    return value
+
 
 TZ = ZoneInfo("Asia/Shanghai")
 STATE_DIR = Path(os.environ.get("OPENCLAW_STATE_DIR", str(Path.home() / ".openclaw")))
@@ -20,6 +35,18 @@ CRON_PATH = STATE_DIR / "cron" / "jobs.json"
 TEAM_PATH = Path(__file__).with_name("team-status.json")
 BUSINESS_METRICS_PATH = Path(__file__).with_name("business-metrics.json")
 OUT_PATH = Path(__file__).with_name("dashboard-data.json")
+CONTROL_TASK_HISTORY_PATH = STATE_DIR / "run" / "control-task-history.jsonl"
+DASHBOARD_CACHE_DIR = STATE_DIR / "run" / "dashboard-cache"
+
+GITHUB_TRACKER_CACHE_TTL_SEC = read_env_int("OPENCLAW_GITHUB_TRACKER_CACHE_TTL_SEC", 300, minimum=60, maximum=3600)
+GITHUB_ISSUE_SCHEDULE_CACHE_TTL_SEC = read_env_int(
+    "OPENCLAW_GITHUB_ISSUE_SCHEDULE_CACHE_TTL_SEC", 600, minimum=120, maximum=14400
+)
+GITHUB_ISSUE_EVIDENCE_CACHE_TTL_SEC = read_env_int(
+    "OPENCLAW_GITHUB_ISSUE_EVIDENCE_CACHE_TTL_SEC", 1800, minimum=120, maximum=43200
+)
+GITHUB_API_BUDGET_LIMIT = read_env_int("OPENCLAW_GITHUB_API_BUDGET", 80, minimum=10, maximum=500)
+DASHBOARD_DATA_SLA_MINUTES = read_env_int("DASHBOARD_DATA_SLA_MINUTES", 15, minimum=3, maximum=240)
 
 COMPANY_AGENT_IDS = [
     "rd-company",
@@ -80,12 +107,13 @@ def read_json(path: Path, fallback):
         return fallback
 
 
-def run_cmd(cmd, cwd: Optional[Path] = None, env: Optional[dict] = None):
+def run_cmd(cmd: Sequence[str] | str, cwd: Optional[Path] = None, env: Optional[dict] = None):
     try:
+        argv = shlex.split(cmd) if isinstance(cmd, str) else [str(part) for part in cmd]
         proc = subprocess.run(
-            cmd,
+            argv,
             cwd=str(cwd) if cwd else None,
-            shell=isinstance(cmd, str),
+            shell=False,
             env=env,
             capture_output=True,
             text=True,
@@ -99,6 +127,92 @@ def run_cmd(cmd, cwd: Optional[Path] = None, env: Optional[dict] = None):
         }
     except Exception as e:
         return {"ok": False, "code": -1, "stdout": "", "stderr": str(e)}
+
+
+def now_ms():
+    return int(datetime.now(tz=TZ).timestamp() * 1000)
+
+
+def repo_cache_path(prefix: str, repo_slug: Optional[str]):
+    slug = (repo_slug or "unknown").strip().lower() or "unknown"
+    safe_slug = re.sub(r"[^a-z0-9._-]+", "_", slug)
+    return DASHBOARD_CACHE_DIR / f"{prefix}-{safe_slug}.json"
+
+
+def read_json_cache(path: Path):
+    raw = read_json(path, {})
+    if not isinstance(raw, dict):
+        return None
+    payload = raw.get("data")
+    if not isinstance(payload, dict):
+        return None
+    try:
+        generated_at_ms = int(raw.get("generatedAtMs") or 0)
+    except Exception:
+        generated_at_ms = 0
+    age_sec = None
+    if generated_at_ms > 0:
+        age_sec = max(0, int((now_ms() - generated_at_ms) / 1000))
+    return {
+        "generatedAtMs": generated_at_ms,
+        "ageSec": age_sec,
+        "data": payload,
+    }
+
+
+def write_json_cache(path: Path, payload: dict):
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        body = {
+            "generatedAtMs": now_ms(),
+            "data": payload,
+        }
+        path.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        return
+
+
+def read_fresh_cache(path: Path, ttl_sec: int):
+    cached = read_json_cache(path)
+    if not cached:
+        return None
+    age_sec = cached.get("ageSec")
+    if not isinstance(age_sec, int) or age_sec > int(ttl_sec):
+        return None
+    return cached
+
+
+def new_github_api_budget(limit: Optional[int] = None):
+    bounded = int(limit if isinstance(limit, int) else GITHUB_API_BUDGET_LIMIT)
+    if bounded < 1:
+        bounded = 1
+    return {"limit": bounded, "used": 0, "degraded": False, "skipped": 0}
+
+
+def consume_api_budget(api_budget: Optional[dict], cost: int = 1):
+    if not isinstance(api_budget, dict):
+        return True
+    try:
+        limit = int(api_budget.get("limit") or 0)
+    except Exception:
+        limit = 0
+    try:
+        used = int(api_budget.get("used") or 0)
+    except Exception:
+        used = 0
+    amount = max(1, int(cost))
+    if used + amount > limit:
+        api_budget["degraded"] = True
+        api_budget["skipped"] = int(api_budget.get("skipped") or 0) + amount
+        return False
+    api_budget["used"] = used + amount
+    return True
+
+
+def run_gh_cmd(cmd: Sequence[str], gh_env: dict, api_budget: Optional[dict] = None, budget_tag: str = "github"):
+    if not consume_api_budget(api_budget, 1):
+        return {"ok": False, "code": -2, "stdout": "", "stderr": f"github api budget exceeded ({budget_tag})"}
+    return run_cmd(cmd, env=gh_env)
 
 
 def fmt_ms(ms):
@@ -217,20 +331,24 @@ def build_project_info(project_dir: Path):
     if not exists:
         return info
 
-    remote = run_cmd("git remote get-url origin", cwd=project_dir)
+    remote = run_cmd(["git", "remote", "get-url", "origin"], cwd=project_dir)
     info["repoUrl"] = remote["stdout"] if remote["ok"] else None
     info["repoSlug"] = parse_repo_slug(info["repoUrl"])
 
-    branch = run_cmd("git branch --show-current", cwd=project_dir)
+    branch = run_cmd(["git", "branch", "--show-current"], cwd=project_dir)
     info["branch"] = branch["stdout"] if branch["ok"] else None
 
-    dirty = run_cmd("git status --short | wc -l", cwd=project_dir)
+    dirty = run_cmd(["git", "status", "--short"], cwd=project_dir)
     try:
-        info["dirtyFiles"] = int(dirty["stdout"]) if dirty["ok"] else None
+        if dirty["ok"]:
+            rows = [line for line in dirty["stdout"].splitlines() if line.strip()]
+            info["dirtyFiles"] = len(rows)
+        else:
+            info["dirtyFiles"] = None
     except Exception:
         info["dirtyFiles"] = None
 
-    commit = run_cmd("git log -1 --pretty='%h|%ci|%s'", cwd=project_dir)
+    commit = run_cmd(["git", "log", "-1", "--pretty=%h|%ci|%s"], cwd=project_dir)
     if commit["ok"] and commit["stdout"]:
         parts = commit["stdout"].split("|", 2)
         if len(parts) == 3:
@@ -550,8 +668,210 @@ def parse_schedule_due(text: str):
     return matches[-1]
 
 
-def get_issue_schedule_due(gh_bin: str, gh_env: dict, repo_slug: str, number: int):
-    res = run_cmd(
+def parse_auto_status_comment_body(text: Optional[str]):
+    body = str(text or "")
+    marker_match = re.search(r"^\[AUTO-STATUS\]\s*([^\n]+)", body, flags=re.MULTILINE)
+    transition_match = re.search(r"^- Transition:\s*(.+)$", body, flags=re.MULTILINE)
+    reason_match = re.search(r"^- Reason:\s*(.+)$", body, flags=re.MULTILINE)
+    evidence_match = re.search(r"^- Evidence:\s*(.+)$", body, flags=re.MULTILINE)
+    evidence_type_match = re.search(r"^- EvidenceType:\s*(.+)$", body, flags=re.MULTILINE)
+    evidence_url_match = re.search(r"^- EvidenceURL:\s*(.+)$", body, flags=re.MULTILINE)
+    issue_url_match = re.search(r"^- IssueURL:\s*(.+)$", body, flags=re.MULTILINE)
+    synced_at_match = re.search(r"^- SyncedAt:\s*(.+)$", body, flags=re.MULTILINE)
+
+    parsed = {
+        "marker": (marker_match.group(1).strip() if marker_match else None),
+        "transition": (transition_match.group(1).strip() if transition_match else None),
+        "reason": (reason_match.group(1).strip() if reason_match else None),
+        "evidenceText": (evidence_match.group(1).strip() if evidence_match else None),
+        "evidenceType": (evidence_type_match.group(1).strip() if evidence_type_match else None),
+        "evidenceUrl": (evidence_url_match.group(1).strip() if evidence_url_match else None),
+        "issueUrl": (issue_url_match.group(1).strip() if issue_url_match else None),
+        "syncedAt": (synced_at_match.group(1).strip() if synced_at_match else None),
+    }
+
+    json_match = re.search(r"^\[AUTO-EVIDENCE\]\s*(\{.*\})\s*$", body, flags=re.MULTILINE)
+    if json_match:
+        try:
+            payload = json.loads(json_match.group(1))
+        except Exception:
+            payload = {}
+        if isinstance(payload, dict):
+            if not parsed.get("evidenceType") and payload.get("evidenceType"):
+                parsed["evidenceType"] = str(payload.get("evidenceType"))
+            if not parsed.get("evidenceUrl") and payload.get("evidenceUrl"):
+                parsed["evidenceUrl"] = str(payload.get("evidenceUrl"))
+            if not parsed.get("issueUrl") and payload.get("issueUrl"):
+                parsed["issueUrl"] = str(payload.get("issueUrl"))
+            if not parsed.get("syncedAt") and payload.get("syncedAt"):
+                parsed["syncedAt"] = str(payload.get("syncedAt"))
+    return parsed
+
+
+def get_issue_status_comment(gh_bin: str, gh_env: dict, repo_slug: str, number: int, api_budget: Optional[dict] = None):
+    res = run_gh_cmd(
+        [
+            gh_bin,
+            "issue",
+            "view",
+            str(number),
+            "--repo",
+            repo_slug,
+            "--json",
+            "comments",
+            "--jq",
+            '[.comments[] | select(.body | startswith("[AUTO-STATUS]")) | {url,createdAt,body}] | .[-1] // {}',
+        ],
+        gh_env,
+        api_budget=api_budget,
+        budget_tag="issue-evidence-comment",
+    )
+    if not res["ok"]:
+        return {"ok": False, "comment": None, "budgetExceeded": int(res.get("code") or 0) == -2}
+
+    parsed = {}
+    if res.get("stdout"):
+        try:
+            parsed = json.loads(res.get("stdout") or "{}")
+        except Exception:
+            parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    created_iso = parsed.get("createdAt") if isinstance(parsed.get("createdAt"), str) else None
+    created_at_ms = parse_iso_ms(created_iso)
+    created_at = format_local_datetime(created_iso)
+    body = parsed.get("body") if isinstance(parsed.get("body"), str) else ""
+    fields = parse_auto_status_comment_body(body)
+    summary = fields.get("transition") or fields.get("reason") or fields.get("evidenceText")
+    comment = {
+        "url": parsed.get("url") if isinstance(parsed.get("url"), str) and parsed.get("url") else None,
+        "createdAt": created_at,
+        "createdAtMs": created_at_ms,
+        "marker": fields.get("marker"),
+        "transition": fields.get("transition"),
+        "reason": fields.get("reason"),
+        "summary": summary,
+        "evidenceType": fields.get("evidenceType"),
+        "evidenceUrl": fields.get("evidenceUrl"),
+        "issueUrl": fields.get("issueUrl"),
+        "syncedAt": fields.get("syncedAt"),
+    }
+    has_signal = bool(comment.get("marker") or comment.get("summary") or comment.get("url"))
+    return {"ok": True, "comment": (comment if has_signal else None), "budgetExceeded": False}
+
+
+def resolve_issue_status_comment_map(
+    issues: list[dict], repo_slug: str, gh_bin: str, gh_env: dict, api_budget: Optional[dict] = None
+):
+    cache_path = repo_cache_path("github-issue-status-evidence", repo_slug)
+    cached = read_json_cache(cache_path)
+    cached_issues = {}
+    if cached and isinstance(cached.get("data"), dict):
+        cached_issues = (cached.get("data") or {}).get("issues") or {}
+    if not isinstance(cached_issues, dict):
+        cached_issues = {}
+
+    current_ms = now_ms()
+    ttl_ms = GITHUB_ISSUE_EVIDENCE_CACHE_TTL_SEC * 1000
+    comment_by_issue = {}
+    refreshed = 0
+    cache_hits = 0
+    stale_hits = 0
+    budget_skips = 0
+    budget_exhausted = False
+    active_done_keys = set()
+
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        if str(issue.get("status") or "") != "done":
+            continue
+        try:
+            number = int(issue.get("number") or 0)
+        except Exception:
+            number = 0
+        if number <= 0:
+            continue
+
+        key = str(number)
+        active_done_keys.add(key)
+        updated_at = str(issue.get("updatedAt") or "")
+        status = str(issue.get("status") or "")
+        entry = cached_issues.get(key) if isinstance(cached_issues.get(key), dict) else {}
+        cached_comment = entry.get("comment") if isinstance(entry.get("comment"), dict) else None
+        cached_updated_at = str(entry.get("updatedAt") or "")
+        cached_status = str(entry.get("status") or "")
+        try:
+            cached_at_ms = int(entry.get("cachedAtMs") or 0)
+        except Exception:
+            cached_at_ms = 0
+
+        is_fresh = (
+            cached_at_ms > 0
+            and cached_updated_at == updated_at
+            and cached_status == status
+            and (current_ms - cached_at_ms) <= ttl_ms
+        )
+        if is_fresh:
+            if cached_comment:
+                comment_by_issue[number] = cached_comment
+            cache_hits += 1
+            continue
+
+        if budget_exhausted:
+            if key in cached_issues:
+                stale_hits += 1
+            if cached_comment:
+                comment_by_issue[number] = cached_comment
+            budget_skips += 1
+            continue
+
+        comment_res = get_issue_status_comment(gh_bin, gh_env, repo_slug, number, api_budget=api_budget)
+        if comment_res.get("budgetExceeded"):
+            budget_exhausted = True
+            if key in cached_issues:
+                stale_hits += 1
+            if cached_comment:
+                comment_by_issue[number] = cached_comment
+            budget_skips += 1
+            continue
+
+        comment_value = comment_res.get("comment") if isinstance(comment_res.get("comment"), dict) else None
+        if comment_value:
+            comment_by_issue[number] = comment_value
+        refreshed += 1
+        cached_issues[key] = {
+            "updatedAt": updated_at,
+            "status": status,
+            "comment": comment_value,
+            "cachedAtMs": current_ms,
+        }
+
+    keep_after_ms = current_ms - (14 * 24 * 3600 * 1000)
+    compacted = {}
+    for key, row in cached_issues.items():
+        if not isinstance(row, dict):
+            continue
+        try:
+            cached_at_ms = int(row.get("cachedAtMs") or 0)
+        except Exception:
+            cached_at_ms = 0
+        if key in active_done_keys or (cached_at_ms > 0 and cached_at_ms >= keep_after_ms):
+            compacted[key] = row
+
+    write_json_cache(cache_path, {"issues": compacted})
+    return {
+        "commentByIssue": comment_by_issue,
+        "cacheHits": cache_hits,
+        "staleHits": stale_hits,
+        "refreshed": refreshed,
+        "budgetSkips": budget_skips,
+    }
+
+
+def get_issue_schedule_due(gh_bin: str, gh_env: dict, repo_slug: str, number: int, api_budget: Optional[dict] = None):
+    res = run_gh_cmd(
         [
             gh_bin,
             "issue",
@@ -564,11 +884,121 @@ def get_issue_schedule_due(gh_bin: str, gh_env: dict, repo_slug: str, number: in
             "--jq",
             '[.comments[] | select(.body | startswith("[SCHEDULE]")) | .body] | .[-1] // ""',
         ],
-        env=gh_env,
+        gh_env,
+        api_budget=api_budget,
+        budget_tag="issue-schedule",
     )
-    if not res["ok"] or not res["stdout"]:
-        return None
-    return parse_schedule_due(res["stdout"])
+    if not res["ok"]:
+        return {"ok": False, "due": None, "budgetExceeded": int(res.get("code") or 0) == -2}
+    due = parse_schedule_due(res["stdout"]) if res.get("stdout") else None
+    return {"ok": True, "due": due, "budgetExceeded": False}
+
+
+def resolve_issue_schedule_due_map(
+    raw_issues: list[dict], repo_slug: str, gh_bin: str, gh_env: dict, api_budget: Optional[dict] = None
+):
+    cache_path = repo_cache_path("github-issue-schedule", repo_slug)
+    cached = read_json_cache(cache_path)
+    cached_issues = {}
+    if cached and isinstance(cached.get("data"), dict):
+        cached_issues = (cached.get("data") or {}).get("issues") or {}
+    if not isinstance(cached_issues, dict):
+        cached_issues = {}
+
+    current_ms = now_ms()
+    ttl_ms = GITHUB_ISSUE_SCHEDULE_CACHE_TTL_SEC * 1000
+    due_by_issue = {}
+    refreshed = 0
+    cache_hits = 0
+    stale_hits = 0
+    budget_skips = 0
+    budget_exhausted = False
+    active_open_keys = set()
+
+    for item in raw_issues:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("state") or "").lower() != "open":
+            continue
+        try:
+            number = int(item.get("number") or 0)
+        except Exception:
+            number = 0
+        if number <= 0:
+            continue
+
+        key = str(number)
+        active_open_keys.add(key)
+        updated_at = str(item.get("updatedAt") or "")
+        entry = cached_issues.get(key) if isinstance(cached_issues.get(key), dict) else {}
+        cached_due = entry.get("due")
+        cached_updated_at = str(entry.get("updatedAt") or "")
+        try:
+            cached_at_ms = int(entry.get("cachedAtMs") or 0)
+        except Exception:
+            cached_at_ms = 0
+
+        if cached_due and not isinstance(cached_due, str):
+            cached_due = None
+
+        is_fresh = (
+            cached_at_ms > 0
+            and cached_updated_at == updated_at
+            and (current_ms - cached_at_ms) <= ttl_ms
+        )
+        if is_fresh:
+            due_by_issue[number] = cached_due
+            cache_hits += 1
+            continue
+
+        if budget_exhausted:
+            if key in cached_issues:
+                stale_hits += 1
+            due_by_issue[number] = cached_due
+            budget_skips += 1
+            continue
+
+        due_res = get_issue_schedule_due(gh_bin, gh_env, repo_slug, number, api_budget=api_budget)
+        if due_res.get("budgetExceeded"):
+            budget_exhausted = True
+            if key in cached_issues:
+                stale_hits += 1
+            due_by_issue[number] = cached_due
+            budget_skips += 1
+            continue
+
+        due_value = due_res.get("due")
+        if due_value and not isinstance(due_value, str):
+            due_value = None
+        due_by_issue[number] = due_value
+        refreshed += 1
+        cached_issues[key] = {
+            "updatedAt": updated_at,
+            "due": due_value,
+            "cachedAtMs": current_ms,
+        }
+
+    # Keep current open issues + recent entries (7 days) to avoid unlimited growth.
+    keep_after_ms = current_ms - (7 * 24 * 3600 * 1000)
+    compacted = {}
+    for key, row in cached_issues.items():
+        if not isinstance(row, dict):
+            continue
+        try:
+            cached_at_ms = int(row.get("cachedAtMs") or 0)
+        except Exception:
+            cached_at_ms = 0
+        if key in active_open_keys or (cached_at_ms > 0 and cached_at_ms >= keep_after_ms):
+            compacted[key] = row
+
+    write_json_cache(cache_path, {"issues": compacted})
+    return {
+        "dueByIssue": due_by_issue,
+        "cacheHits": cache_hits,
+        "staleHits": stale_hits,
+        "refreshed": refreshed,
+        "budgetSkips": budget_skips,
+    }
 
 
 def parse_issue_status(labels: list[str], state: str):
@@ -593,7 +1023,7 @@ def issue_sort_key(issue: dict):
     return (PRIORITY_RANK.get(issue.get("priority") or "", 9), issue.get("number") or 999999)
 
 
-def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
+def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict, api_budget: Optional[dict] = None):
     empty = {
         "ok": False,
         "repo": repo_slug,
@@ -612,12 +1042,31 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
         "milestones": [],
         "error": None,
         "source": "none",
+        "cache": {},
     }
     if not repo_slug:
         empty["error"] = "missing repo slug"
         return empty
 
-    issue_res = run_cmd(
+    tracker_cache_path = repo_cache_path("github-tracker", repo_slug)
+    fresh_cache = read_fresh_cache(tracker_cache_path, GITHUB_TRACKER_CACHE_TTL_SEC)
+    if fresh_cache and isinstance(fresh_cache.get("data"), dict):
+        payload = dict(fresh_cache.get("data") or {})
+        cache_meta = dict(payload.get("cache") or {})
+        cache_meta.update(
+            {
+                "trackerCacheHit": True,
+                "trackerCacheAgeSec": fresh_cache.get("ageSec"),
+                "trackerCacheTtlSec": GITHUB_TRACKER_CACHE_TTL_SEC,
+            }
+        )
+        payload["cache"] = cache_meta
+        payload["source"] = "github-cache"
+        payload["error"] = payload.get("error")
+        return payload
+
+    stale_cache = read_json_cache(tracker_cache_path)
+    issue_res = run_gh_cmd(
         [
             gh_bin,
             "issue",
@@ -631,9 +1080,26 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
             "--json",
             "number,title,state,labels,milestone,assignees,updatedAt,url",
         ],
-        env=gh_env,
+        gh_env,
+        api_budget=api_budget,
+        budget_tag="issue-list",
     )
     if not issue_res["ok"]:
+        if int(issue_res.get("code") or 0) == -2 and stale_cache and isinstance(stale_cache.get("data"), dict):
+            payload = dict(stale_cache.get("data") or {})
+            cache_meta = dict(payload.get("cache") or {})
+            cache_meta.update(
+                {
+                    "trackerCacheHit": True,
+                    "trackerCacheAgeSec": stale_cache.get("ageSec"),
+                    "trackerCacheTtlSec": GITHUB_TRACKER_CACHE_TTL_SEC,
+                    "trackerStaleFallback": True,
+                }
+            )
+            payload["cache"] = cache_meta
+            payload["source"] = "github-cache-stale"
+            payload["error"] = None
+            return payload
         empty["error"] = issue_res["stderr"] or issue_res["stdout"] or "gh issue list failed"
         return empty
 
@@ -643,6 +1109,8 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
         empty["error"] = "invalid issue json"
         return empty
 
+    schedule_meta = resolve_issue_schedule_due_map(raw_issues, repo_slug, gh_bin, gh_env, api_budget=api_budget)
+    due_by_issue = schedule_meta.get("dueByIssue") or {}
     today = datetime.now(tz=TZ).strftime("%Y-%m-%d")
     issues = []
 
@@ -667,7 +1135,9 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
         if not owners:
             owners = ["rd-company"]
 
-        due = get_issue_schedule_due(gh_bin, gh_env, repo_slug, number) if state == "open" else None
+        due = due_by_issue.get(number) if state == "open" else None
+        if due and not isinstance(due, str):
+            due = None
         overdue = bool(due and due < today and state != "closed")
 
         issues.append(
@@ -687,10 +1157,20 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
                 "updatedAtMs": parse_iso_ms(item.get("updatedAt")),
                 "scheduleDue": due,
                 "isOverdue": overdue,
+                "statusComment": None,
             }
         )
 
     issues.sort(key=issue_sort_key)
+    evidence_meta = resolve_issue_status_comment_map(issues, repo_slug, gh_bin, gh_env, api_budget=api_budget)
+    comment_by_issue = evidence_meta.get("commentByIssue") or {}
+    for issue in issues:
+        try:
+            num = int(issue.get("number") or 0)
+        except Exception:
+            num = 0
+        if num > 0 and isinstance(comment_by_issue.get(num), dict):
+            issue["statusComment"] = comment_by_issue.get(num)
 
     stats = {
         "total": len(issues),
@@ -745,7 +1225,12 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
                 bucket["overdue"] += 1
             bucket["issues"].append(issue)
 
-    milestone_res = run_cmd([gh_bin, "api", f"repos/{repo_slug}/milestones?state=all&per_page=100"], env=gh_env)
+    milestone_res = run_gh_cmd(
+        [gh_bin, "api", f"repos/{repo_slug}/milestones?state=all&per_page=100"],
+        gh_env,
+        api_budget=api_budget,
+        budget_tag="milestones",
+    )
     milestones = []
     if milestone_res["ok"]:
         try:
@@ -786,7 +1271,7 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
             )
 
     milestones.sort(key=lambda x: (x.get("deadline") or "9999-12-31", x.get("name") or ""))
-    return {
+    result = {
         "ok": True,
         "repo": repo_slug,
         "issues": issues,
@@ -795,7 +1280,23 @@ def fetch_github_tracker(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
         "milestones": milestones,
         "error": None,
         "source": "github",
+        "cache": {
+            "trackerCacheHit": False,
+            "trackerCacheTtlSec": GITHUB_TRACKER_CACHE_TTL_SEC,
+            "scheduleCacheTtlSec": GITHUB_ISSUE_SCHEDULE_CACHE_TTL_SEC,
+            "scheduleCacheHits": int(schedule_meta.get("cacheHits") or 0),
+            "scheduleStaleHits": int(schedule_meta.get("staleHits") or 0),
+            "scheduleRefreshed": int(schedule_meta.get("refreshed") or 0),
+            "scheduleBudgetSkips": int(schedule_meta.get("budgetSkips") or 0),
+            "evidenceCacheTtlSec": GITHUB_ISSUE_EVIDENCE_CACHE_TTL_SEC,
+            "evidenceCacheHits": int(evidence_meta.get("cacheHits") or 0),
+            "evidenceStaleHits": int(evidence_meta.get("staleHits") or 0),
+            "evidenceRefreshed": int(evidence_meta.get("refreshed") or 0),
+            "evidenceBudgetSkips": int(evidence_meta.get("budgetSkips") or 0),
+        },
     }
+    write_json_cache(tracker_cache_path, result)
+    return result
 
 
 def parse_issue_refs(text: Optional[str]):
@@ -819,7 +1320,7 @@ def parse_issue_refs(text: Optional[str]):
     return out
 
 
-def fetch_github_timeline(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
+def fetch_github_timeline(repo_slug: Optional[str], gh_bin: str, gh_env: dict, api_budget: Optional[dict] = None):
     empty = {
         "ok": False,
         "repo": repo_slug,
@@ -836,7 +1337,7 @@ def fetch_github_timeline(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
     prs = []
     commits = []
 
-    prs_res = run_cmd(
+    prs_res = run_gh_cmd(
         [
             gh_bin,
             "pr",
@@ -850,7 +1351,9 @@ def fetch_github_timeline(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
             "--json",
             "number,title,state,isDraft,updatedAt,mergedAt,url,body",
         ],
-        env=gh_env,
+        gh_env,
+        api_budget=api_budget,
+        budget_tag="pr-list",
     )
     if prs_res.get("ok"):
         try:
@@ -883,7 +1386,12 @@ def fetch_github_timeline(repo_slug: Optional[str], gh_bin: str, gh_env: dict):
     else:
         errors.append(prs_res.get("stderr") or prs_res.get("stdout") or "gh pr list failed")
 
-    commits_res = run_cmd([gh_bin, "api", f"repos/{repo_slug}/commits?per_page=50"], env=gh_env)
+    commits_res = run_gh_cmd(
+        [gh_bin, "api", f"repos/{repo_slug}/commits?per_page=50"],
+        gh_env,
+        api_budget=api_budget,
+        budget_tag="commits",
+    )
     if commits_res.get("ok"):
         try:
             raw_commits = json.loads(commits_res.get("stdout") or "[]")
@@ -1116,6 +1624,202 @@ def build_owner_timeline_evidence(github_tracker: dict, issue_deltas: dict, gith
     return evidence
 
 
+def build_role_evidence_chains(github_tracker: dict, issue_deltas: dict, github_timeline: dict):
+    issues = github_tracker.get("issues") or []
+    issue_map = {}
+    owner_issue_nums = {aid: set() for aid in COMPANY_AGENT_IDS}
+    events_by_issue = defaultdict(list)
+    dedupe_by_issue = defaultdict(set)
+
+    def add_event(issue_num: int, event: dict):
+        if issue_num <= 0 or not isinstance(event, dict):
+            return
+        url = event.get("url")
+        if not isinstance(url, str) or not url.strip():
+            return
+        at_ms = event.get("atMs")
+        if not isinstance(at_ms, int):
+            at_ms = parse_iso_ms(event.get("at")) or None
+        at_text = event.get("at")
+        if not isinstance(at_text, str) or not at_text.strip():
+            at_text = fmt_ms(at_ms) if isinstance(at_ms, int) else None
+        if at_text and not isinstance(at_ms, int):
+            dt = parse_local_time(at_text)
+            if dt:
+                at_ms = int(dt.timestamp() * 1000)
+        key = (
+            str(event.get("type") or ""),
+            str(url),
+            str(at_text or ""),
+            str(event.get("summary") or ""),
+        )
+        seen = dedupe_by_issue.setdefault(issue_num, set())
+        if key in seen:
+            return
+        seen.add(key)
+        row = {
+            "issueNumber": issue_num,
+            "issueTitle": event.get("issueTitle") or "",
+            "type": event.get("type") or "issue",
+            "url": url,
+            "at": at_text,
+            "atMs": at_ms,
+            "summary": event.get("summary") or "",
+        }
+        events_by_issue.setdefault(issue_num, []).append(row)
+
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        try:
+            number = int(issue.get("number") or 0)
+        except Exception:
+            number = 0
+        if number <= 0:
+            continue
+        issue_map[number] = issue
+        owners = [x for x in (issue.get("owners") or []) if x in owner_issue_nums]
+        if not owners:
+            owners = ["rd-company"]
+        for aid in owners:
+            owner_issue_nums.setdefault(aid, set()).add(number)
+        owner_issue_nums.setdefault("rd-company", set()).add(number)
+
+        title = str(issue.get("title") or "")
+        add_event(
+            number,
+            {
+                "issueTitle": title,
+                "type": "issue",
+                "url": issue.get("url"),
+                "at": issue.get("updatedAt"),
+                "atMs": issue.get("updatedAtMs"),
+                "summary": f"Issue #{number} · {issue.get('status') or '-'} · {title}".strip(" ·"),
+            },
+        )
+
+        status_comment = issue.get("statusComment")
+        if isinstance(status_comment, dict):
+            comment_url = status_comment.get("url") or status_comment.get("evidenceUrl") or issue.get("url")
+            comment_at = status_comment.get("createdAt") or status_comment.get("syncedAt")
+            comment_ms = status_comment.get("createdAtMs")
+            summary = status_comment.get("transition") or status_comment.get("summary") or status_comment.get("reason")
+            marker = status_comment.get("marker")
+            if marker and summary:
+                summary = f"{marker} · {summary}"
+            elif marker:
+                summary = marker
+            add_event(
+                number,
+                {
+                    "issueTitle": title,
+                    "type": "comment",
+                    "url": comment_url,
+                    "at": comment_at,
+                    "atMs": comment_ms,
+                    "summary": summary or f"Issue #{number} 状态评论",
+                },
+            )
+
+    for pr in (github_timeline or {}).get("prs") or []:
+        if not isinstance(pr, dict):
+            continue
+        refs = set()
+        for item in pr.get("issueRefs") or []:
+            try:
+                num = int(item)
+            except Exception:
+                num = 0
+            if num > 0 and num in issue_map:
+                refs.add(num)
+        if not refs:
+            continue
+        pr_no = int(pr.get("number") or 0)
+        title = str(pr.get("title") or "").strip()
+        pr_state = str(pr.get("state") or "").strip().lower()
+        for num in refs:
+            add_event(
+                num,
+                {
+                    "issueTitle": issue_map.get(num, {}).get("title") or "",
+                    "type": "pr",
+                    "url": pr.get("url"),
+                    "at": pr.get("mergedAt") or pr.get("updatedAt"),
+                    "atMs": pr.get("mergedAtMs") or pr.get("updatedAtMs"),
+                    "summary": f"PR #{pr_no} ({pr_state or '-'}) · {title}".strip(" ·"),
+                },
+            )
+
+    for commit in (github_timeline or {}).get("commits") or []:
+        if not isinstance(commit, dict):
+            continue
+        refs = set()
+        for item in commit.get("issueRefs") or []:
+            try:
+                num = int(item)
+            except Exception:
+                num = 0
+            if num > 0 and num in issue_map:
+                refs.add(num)
+        if not refs:
+            continue
+        sha = str(commit.get("sha") or "-")
+        msg = str(commit.get("message") or "").strip()
+        for num in refs:
+            add_event(
+                num,
+                {
+                    "issueTitle": issue_map.get(num, {}).get("title") or "",
+                    "type": "commit",
+                    "url": commit.get("url"),
+                    "at": commit.get("committedAt"),
+                    "atMs": commit.get("committedAtMs"),
+                    "summary": f"Commit {sha} · {msg}".strip(" ·"),
+                },
+            )
+
+    for tr in (issue_deltas or {}).get("statusTransitions") or []:
+        if not isinstance(tr, dict):
+            continue
+        try:
+            number = int(tr.get("number") or 0)
+        except Exception:
+            number = 0
+        if number <= 0 or number not in issue_map:
+            continue
+        issue = issue_map.get(number) or {}
+        add_event(
+            number,
+            {
+                "issueTitle": issue.get("title") or "",
+                "type": "comment",
+                "url": issue.get("url"),
+                "at": tr.get("updatedAt"),
+                "summary": f"状态变更 {tr.get('from') or '-'} -> {tr.get('to') or '-'}",
+            },
+        )
+
+    chains = {}
+    for aid in COMPANY_AGENT_IDS:
+        nums = owner_issue_nums.get(aid) or set()
+        if aid == "rd-company":
+            nums = set(issue_map.keys())
+        rows = []
+        for num in nums:
+            rows.extend(events_by_issue.get(num) or [])
+        rows.sort(key=lambda x: ((x.get("atMs") or 0), x.get("issueNumber") or 0), reverse=True)
+        rows = rows[:24]
+        stats = {
+            "total": len(rows),
+            "issue": sum(1 for x in rows if x.get("type") == "issue"),
+            "pr": sum(1 for x in rows if x.get("type") == "pr"),
+            "commit": sum(1 for x in rows if x.get("type") == "commit"),
+            "comment": sum(1 for x in rows if x.get("type") == "comment"),
+        }
+        chains[aid] = {"items": rows, "stats": stats}
+    return chains
+
+
 def build_issue_boards(github_tracker: dict, panel: list[dict]):
     if not github_tracker.get("ok") or not github_tracker.get("issues"):
         blockers_board = []
@@ -1173,7 +1877,13 @@ def build_issue_boards(github_tracker: dict, panel: list[dict]):
     return blockers_board, risks_board, "github"
 
 
-def build_agent_panel(cfg: dict, team: dict, github_tracker: dict, owner_evidence: Optional[dict] = None):
+def build_agent_panel(
+    cfg: dict,
+    team: dict,
+    github_tracker: dict,
+    owner_evidence: Optional[dict] = None,
+    role_evidence_chains: Optional[dict] = None,
+):
     now_ms = int(datetime.now(tz=TZ).timestamp() * 1000)
 
     agents = (cfg.get("agents") or {}).get("list") or []
@@ -1198,6 +1908,11 @@ def build_agent_panel(cfg: dict, team: dict, github_tracker: dict, owner_evidenc
         evidence = (owner_evidence or {}).get(aid) if isinstance(owner_evidence, dict) else {}
         if not isinstance(evidence, dict):
             evidence = {}
+        chain_payload = (role_evidence_chains or {}).get(aid) if isinstance(role_evidence_chains, dict) else {}
+        if not isinstance(chain_payload, dict):
+            chain_payload = {}
+        evidence_chain = chain_payload.get("items") if isinstance(chain_payload.get("items"), list) else []
+        evidence_stats = chain_payload.get("stats") if isinstance(chain_payload.get("stats"), dict) else {}
 
         activity = read_agent_activity(agent.get("workspace"))
         activity_level = classify_activity(activity.get("lastActiveMs"), now_ms)
@@ -1346,6 +2061,14 @@ def build_agent_panel(cfg: dict, team: dict, github_tracker: dict, owner_evidenc
                 "progressStallReason": stall.get("reason"),
                 "progressStallLevel": stall.get("level"),
                 "progressEvidence": evidence_summary,
+                "evidenceChain": evidence_chain,
+                "evidenceStats": {
+                    "total": int(evidence_stats.get("total") or len(evidence_chain)),
+                    "issue": int(evidence_stats.get("issue") or 0),
+                    "pr": int(evidence_stats.get("pr") or 0),
+                    "commit": int(evidence_stats.get("commit") or 0),
+                    "comment": int(evidence_stats.get("comment") or 0),
+                },
                 "health": role_health(progress_status, blocker_count, activity_level),
                 "hasWorkspace": bool(agent.get("workspace")),
             }
@@ -1366,7 +2089,7 @@ def build_agent_panel(cfg: dict, team: dict, github_tracker: dict, owner_evidenc
 
 
 def parse_launchd_status(label: str):
-    cmd = f"uid=$(id -u); launchctl print gui/${{uid}}/{label}"
+    cmd = ["launchctl", "print", f"gui/{os.getuid()}/{label}"]
     res = run_cmd(cmd)
     if not res["ok"]:
         return {
@@ -1764,6 +2487,134 @@ def build_activity_feed(group_jobs: list[dict], local_jobs: list[dict], github_t
     return events[:24]
 
 
+def read_control_task_metrics(path: Optional[Path] = None, window_days: int = 7):
+    target = path or CONTROL_TASK_HISTORY_PATH
+    window_days = max(1, int(window_days))
+    now_dt = datetime.now(tz=TZ)
+    start_day = (now_dt - timedelta(days=window_days - 1)).date()
+
+    day_keys = [(start_day + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(window_days)]
+    day_map = {
+        day: {"day": day, "total": 0, "success": 0, "failed": 0, "_durationSum": 0.0, "_durationCount": 0}
+        for day in day_keys
+    }
+
+    summary = {
+        "windowDays": window_days,
+        "total": 0,
+        "success": 0,
+        "failed": 0,
+        "successRate": 0.0,
+        "avgDurationSec": 0.0,
+    }
+    failures_by_task: dict[str, int] = defaultdict(int)
+    latest_failures: list[dict] = []
+    duration_sum = 0.0
+    duration_count = 0
+
+    if target.exists():
+        try:
+            lines = target.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            lines = []
+
+        for raw in lines[-5000:]:
+            try:
+                row = json.loads(raw)
+            except Exception:
+                continue
+            if not isinstance(row, dict):
+                continue
+
+            status = str(row.get("status") or "").lower()
+            if status not in {"success", "failed"}:
+                continue
+
+            when = row.get("finishedAt") or row.get("startedAt")
+            dt = parse_local_time(str(when)) if when else None
+            if not dt:
+                continue
+            day = dt.strftime("%Y-%m-%d")
+            if day not in day_map:
+                continue
+
+            rec = day_map[day]
+            rec["total"] += 1
+            summary["total"] += 1
+
+            if status == "success":
+                rec["success"] += 1
+                summary["success"] += 1
+            else:
+                rec["failed"] += 1
+                summary["failed"] += 1
+                task_name = str(row.get("name") or "unknown")
+                failures_by_task[task_name] += 1
+                latest_failures.append(
+                    {
+                        "id": row.get("id"),
+                        "name": task_name,
+                        "finishedAt": row.get("finishedAt"),
+                        "failedStep": row.get("failedStep"),
+                        "failedCode": row.get("failedCode"),
+                        "error": row.get("error"),
+                        "_ts": int(dt.timestamp() * 1000),
+                    }
+                )
+
+            try:
+                duration = float(row.get("durationSec"))
+            except Exception:
+                duration = -1.0
+            if duration >= 0:
+                rec["_durationSum"] += duration
+                rec["_durationCount"] += 1
+                duration_sum += duration
+                duration_count += 1
+
+    if summary["total"] > 0:
+        summary["successRate"] = round(summary["success"] * 100.0 / summary["total"], 2)
+    if duration_count > 0:
+        summary["avgDurationSec"] = round(duration_sum / duration_count, 2)
+
+    daily = []
+    for day in day_keys:
+        rec = day_map[day]
+        total = rec["total"]
+        success = rec["success"]
+        success_rate = round(success * 100.0 / total, 2) if total > 0 else 0.0
+        avg_duration = round(rec["_durationSum"] / rec["_durationCount"], 2) if rec["_durationCount"] > 0 else 0.0
+        daily.append(
+            {
+                "day": day,
+                "total": total,
+                "success": success,
+                "failed": rec["failed"],
+                "successRate": success_rate,
+                "avgDurationSec": avg_duration,
+            }
+        )
+
+    failures_top = [
+        {"name": name, "count": count}
+        for name, count in sorted(failures_by_task.items(), key=lambda x: x[1], reverse=True)[:5]
+    ]
+    latest_failures.sort(key=lambda x: x.get("_ts") or 0, reverse=True)
+    latest_failures = [
+        {k: v for k, v in item.items() if k != "_ts"}
+        for item in latest_failures[:6]
+    ]
+
+    return {
+        "summary": summary,
+        "daily": daily,
+        "failuresByTask": failures_top,
+        "latestFailures": latest_failures,
+        "generatedAt": now_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "sourceFile": str(target),
+    }
+
+
 def build():
     cfg = read_json(CONFIG_PATH, {})
     cron = read_json(CRON_PATH, {})
@@ -1813,8 +2664,9 @@ def build():
     gh_bin = resolve_gh_bin()
     gh_env = build_gh_env(cfg)
     github_auth = build_github_auth_info(gh_bin, gh_env)
+    github_api_budget = new_github_api_budget()
     repo_slug = project.get("repoSlug") or association.get("projectRepo")
-    github_tracker = fetch_github_tracker(repo_slug, gh_bin, gh_env) if github_auth.get("ok") else {
+    github_tracker = fetch_github_tracker(repo_slug, gh_bin, gh_env, api_budget=github_api_budget) if github_auth.get("ok") else {
         "ok": False,
         "repo": repo_slug,
         "issues": [],
@@ -1832,23 +2684,30 @@ def build():
         "milestones": [],
         "error": "github auth unavailable",
         "source": "none",
+        "cache": {},
     }
 
     issue_deltas = build_issue_deltas(github_tracker.get("issues") or [], previous_snapshot)
-    github_timeline = fetch_github_timeline(repo_slug, gh_bin, gh_env) if github_tracker.get("ok") else {
-        "ok": False,
-        "repo": repo_slug,
-        "prs": [],
-        "commits": [],
-        "error": "github timeline unavailable",
-        "source": "none",
-    }
+    github_timeline = (
+        fetch_github_timeline(repo_slug, gh_bin, gh_env, api_budget=github_api_budget)
+        if github_tracker.get("ok")
+        else {
+            "ok": False,
+            "repo": repo_slug,
+            "prs": [],
+            "commits": [],
+            "error": "github timeline unavailable",
+            "source": "none",
+        }
+    )
     owner_evidence = build_owner_timeline_evidence(github_tracker, issue_deltas, github_timeline)
-    company = build_agent_panel(cfg, team, github_tracker, owner_evidence)
+    role_evidence_chains = build_role_evidence_chains(github_tracker, issue_deltas, github_timeline)
+    company = build_agent_panel(cfg, team, github_tracker, owner_evidence, role_evidence_chains)
     blockers_board, risks_board, blockers_source = build_issue_boards(github_tracker, company.get("agents") or [])
     milestones = github_tracker.get("milestones") if github_tracker.get("milestones") else compute_team_milestones(team)
     milestones_source = "github" if github_tracker.get("milestones") else "team-status"
     activity_feed = build_activity_feed(group_jobs, local_jobs, github_tracker, company.get("agents") or [])
+    control_tasks = read_control_task_metrics()
     business_radar = read_latest_radar_brief()
     business_metrics = read_business_metrics()
     freshness = {
@@ -1857,7 +2716,11 @@ def build():
         "teamStatus": file_mtime(TEAM_PATH),
         "association": file_mtime(ASSOCIATION_PATH),
         "businessMetrics": file_mtime(BUSINESS_METRICS_PATH),
+        "controlTaskHistory": file_mtime(CONTROL_TASK_HISTORY_PATH),
     }
+    api_budget_limit = int(github_api_budget.get("limit") or 0)
+    api_budget_used = int(github_api_budget.get("used") or 0)
+    api_budget_remaining = max(0, api_budget_limit - api_budget_used)
 
     data = {
         "generatedAt": datetime.now(tz=TZ).strftime("%Y-%m-%d %H:%M:%S"),
@@ -1873,6 +2736,8 @@ def build():
             "warnJobs": warn_jobs,
             "allGroupJobs": len(group_jobs),
             "allJobs": len(all_jobs),
+            "controlTask7dTotal": ((control_tasks.get("summary") or {}).get("total") or 0),
+            "controlTask7dSuccessRate": ((control_tasks.get("summary") or {}).get("successRate") or 0.0),
         },
         "project": project,
         "association": {
@@ -1889,6 +2754,14 @@ def build():
             "error": github_tracker.get("error"),
             "issueStats": github_tracker.get("issueStats") or {},
             "issues": github_tracker.get("issues") or [],
+            "cache": github_tracker.get("cache") or {},
+            "apiBudget": {
+                "limit": api_budget_limit,
+                "used": api_budget_used,
+                "remaining": api_budget_remaining,
+                "degraded": bool(github_api_budget.get("degraded")),
+                "skipped": int(github_api_budget.get("skipped") or 0),
+            },
             "timeline": {
                 "ok": github_timeline.get("ok"),
                 "error": github_timeline.get("error"),
@@ -1909,22 +2782,29 @@ def build():
         "roles": team.get("roles") or [],
         "milestones": milestones,
         "activityFeed": activity_feed,
+        "controlTasks": control_tasks,
         "deltas": {
             "issues": issue_deltas,
         },
         "businessRadar": business_radar,
         "businessMetrics": business_metrics,
         "freshness": freshness,
+        "sla": {
+            "dashboardDataMaxAgeMinutes": DASHBOARD_DATA_SLA_MINUTES,
+        },
         "cronJobs": sorted(all_jobs, key=lambda x: (x.get("kind") != "openclaw-cron", x.get("name") or "")),
         "dataSources": {
             "agentPanel": "github-issues+timeline-strict" if github_tracker.get("ok") else "session+team-status",
+            "github": "gh-cli+ttl-cache+api-budget",
             "blockers": blockers_source,
             "milestones": milestones_source,
             "cronJobs": "openclaw-cron+launchd",
             "activityFeed": "cron+github+agent-sessions",
             "issueDeltas": "snapshot-diff",
+            "roleEvidence": "issue+pr+commit+auto-status-comment",
             "businessRadar": "delivery-queue",
             "businessMetrics": "business-metrics.json" if business_metrics.get("isReal") else "proxy-estimation",
+            "controlTasks": "run/control-task-history.jsonl",
         },
     }
 

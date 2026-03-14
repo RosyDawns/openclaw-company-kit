@@ -35,6 +35,100 @@ fi
 
 SHARED_CONTEXT_DIR="${PROFILE_DIR}/shared-context"
 
+PROFILE_DIR_EXISTED=0
+TARGET_WORKSPACE_EXISTED=0
+SHARED_CONTEXT_DIR_EXISTED=0
+[ -d "${PROFILE_DIR}" ] && PROFILE_DIR_EXISTED=1
+[ -d "${TARGET_WORKSPACE}" ] && TARGET_WORKSPACE_EXISTED=1
+[ -d "${SHARED_CONTEXT_DIR}" ] && SHARED_CONTEXT_DIR_EXISTED=1
+
+ROLLBACK_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/openclaw-install-rollback.XXXXXX")"
+ROLLBACK_DONE=0
+INSTALL_COMPLETED=0
+
+backup_file_if_exists() {
+  local file_path="$1"
+  local backup_path="${ROLLBACK_ROOT}${file_path}"
+  if [ -f "${file_path}" ]; then
+    mkdir -p "$(dirname "${backup_path}")"
+    cp -p "${file_path}" "${backup_path}"
+  fi
+}
+
+backup_dir_if_exists() {
+  local dir_path="$1"
+  local backup_path="${ROLLBACK_ROOT}${dir_path}"
+  if [ -d "${dir_path}" ]; then
+    mkdir -p "$(dirname "${backup_path}")"
+    cp -a "${dir_path}" "${backup_path}"
+  fi
+}
+
+restore_file_or_remove() {
+  local file_path="$1"
+  local backup_path="${ROLLBACK_ROOT}${file_path}"
+  if [ -f "${backup_path}" ]; then
+    mkdir -p "$(dirname "${file_path}")"
+    cp -p "${backup_path}" "${file_path}"
+  else
+    rm -f "${file_path}"
+  fi
+}
+
+restore_dir_or_remove() {
+  local dir_path="$1"
+  local backup_path="${ROLLBACK_ROOT}${dir_path}"
+  if [ -d "${backup_path}" ]; then
+    rm -rf "${dir_path}"
+    mkdir -p "$(dirname "${dir_path}")"
+    cp -a "${backup_path}" "${dir_path}"
+  else
+    rm -rf "${dir_path}"
+  fi
+}
+
+rollback_install() {
+  local exit_code="$1"
+  local line_no="$2"
+  if [ "${INSTALL_COMPLETED}" -eq 1 ] || [ "${ROLLBACK_DONE}" -eq 1 ]; then
+    return
+  fi
+  ROLLBACK_DONE=1
+
+  echo "[ROLLBACK] install failed at line ${line_no} (exit=${exit_code}), restoring previous state..." >&2
+
+  restore_file_or_remove "${PROFILE_DIR}/openclaw.json"
+  restore_file_or_remove "${PROFILE_DIR}/exec-approvals.json"
+  restore_dir_or_remove "${TARGET_AGENTS_DIR}"
+  restore_dir_or_remove "${TARGET_DASHBOARD_DIR}"
+
+  if [ "${SHARED_CONTEXT_DIR_EXISTED}" -eq 1 ]; then
+    restore_file_or_remove "${SHARED_CONTEXT_DIR}/priorities.md"
+  else
+    rm -rf "${SHARED_CONTEXT_DIR}"
+  fi
+
+  if [ "${TARGET_WORKSPACE_EXISTED}" -eq 0 ]; then
+    rm -rf "${TARGET_WORKSPACE}"
+  fi
+  if [ "${PROFILE_DIR_EXISTED}" -eq 0 ]; then
+    rmdir "${PROFILE_DIR}" 2>/dev/null || true
+  fi
+
+  rm -f "${tmp_cfg:-}" >/dev/null 2>&1 || true
+  rm -rf "${ROLLBACK_ROOT}"
+  echo "[ROLLBACK] restore completed" >&2
+  exit "${exit_code}"
+}
+
+backup_file_if_exists "${PROFILE_DIR}/openclaw.json"
+backup_file_if_exists "${PROFILE_DIR}/exec-approvals.json"
+backup_file_if_exists "${SHARED_CONTEXT_DIR}/priorities.md"
+backup_dir_if_exists "${TARGET_AGENTS_DIR}"
+backup_dir_if_exists "${TARGET_DASHBOARD_DIR}"
+
+trap 'rollback_install $? $LINENO' ERR
+
 mkdir -p "${PROFILE_DIR}" "${TARGET_WORKSPACE}" "${TARGET_AGENTS_DIR}" "${TARGET_DASHBOARD_DIR}"
 mkdir -p "${SHARED_CONTEXT_DIR}"/{roundtable,agent-outputs,feedback,kpis}
 
@@ -81,15 +175,55 @@ for agent_id in hot-search ai-tech rd-company role-product role-tech-director ro
   done
 done
 
+WORKFLOW_TEMPLATE_ID="default"
+WORKFLOW_PROMPT_TEMPLATE=""
+case "$(printf '%s' "${WORKFLOW_TEMPLATE:-default}" | tr '[:upper:]' '[:lower:]')" in
+  requirement-review|requirement_review|review)
+    WORKFLOW_TEMPLATE_ID="requirement-review"
+    WORKFLOW_PROMPT_TEMPLATE="${ROOT_DIR}/templates/workflow-prompt.requirement-review.txt"
+    ;;
+  bugfix|bug-fix|bug_fix)
+    WORKFLOW_TEMPLATE_ID="bugfix"
+    WORKFLOW_PROMPT_TEMPLATE="${ROOT_DIR}/templates/workflow-prompt.bugfix.txt"
+    ;;
+  release-retro|release_retro|retro|postmortem)
+    WORKFLOW_TEMPLATE_ID="release-retro"
+    WORKFLOW_PROMPT_TEMPLATE="${ROOT_DIR}/templates/workflow-prompt.release-retro.txt"
+    ;;
+esac
+
 GROUP_PROMPT="$(sed \
   -e "s|__PROJECT_PATH__|${PROJECT_PATH}|g" \
   -e "s|__PROJECT_REPO__|${PROJECT_REPO}|g" \
   "${ROOT_DIR}/templates/group-system-prompt.txt")"
 
+if [ -n "${WORKFLOW_PROMPT_TEMPLATE}" ] && [ -f "${WORKFLOW_PROMPT_TEMPLATE}" ]; then
+  workflow_prompt_rendered="$(sed \
+    -e "s|__PROJECT_PATH__|${PROJECT_PATH}|g" \
+    -e "s|__PROJECT_REPO__|${PROJECT_REPO}|g" \
+    -e "s|__PROJECT_NAME__|${COMPANY_NAME}|g" \
+    "${WORKFLOW_PROMPT_TEMPLATE}")"
+  GROUP_PROMPT="${GROUP_PROMPT}"$'\n\n'"${workflow_prompt_rendered}"
+fi
+
+if [ -n "${FEISHU_ALLOW_FROM}" ]; then
+  allow_from_json="$(jq -cn --arg raw "${FEISHU_ALLOW_FROM}" --arg groupId "${GROUP_ID}" '
+    $raw
+    | split(",")
+    | map(gsub("^\\s+|\\s+$"; ""))
+    | map(select(length > 0))
+    | if length == 0 then [$groupId] else . end
+  ')"
+else
+  # Secure default: only accept events from configured group.
+  allow_from_json="$(jq -cn --arg groupId "${GROUP_ID}" '[$groupId]')"
+fi
+
 tmp_cfg="$(mktemp)"
 jq \
   --arg stateDir "${PROFILE_DIR}" \
   --arg groupId "${GROUP_ID}" \
+  --argjson allowFrom "${allow_from_json}" \
   --arg companyName "${COMPANY_NAME}" \
   --arg projectPath "${PROJECT_PATH}" \
   --arg projectRepo "${PROJECT_REPO}" \
@@ -123,7 +257,7 @@ jq \
     {"id":"rd-company","name":"公司研发中台","workspace":($stateDir + "/agents/rd-company"),
      "identity":{"name":"研发总监"},
      "tools":{"allow":["exec","read","write","edit","gh-issues","sessions_send","sessions_spawn","sessions_list","sessions_history","session_status"]},
-     "subagents":{"allowAgents":["role-tech-director","role-senior-dev","role-code-reviewer","role-qa-test","role-product","role-growth"],"maxSpawnDepth":2}},
+     "subagents":{"allowAgents":["role-tech-director","role-senior-dev","role-code-reviewer","role-qa-test","role-product","role-growth"]}},
     {"id":"role-product","name":"产品经理","workspace":($stateDir + "/agents/role-product"),
      "identity":{"name":"产品经理"},
      "tools":{"allow":["read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
@@ -170,14 +304,14 @@ jq \
         "appId": $hotAppId,
         "appSecret": $hotAppSecret,
         "botName": $hotBotName,
-        "dmPolicy": "open",
-        "groupPolicy": "open",
-        "allowFrom": ["*"]
+        "dmPolicy": "allowlist",
+        "groupPolicy": "allowlist",
+        "allowFrom": $allowFrom
       },
       "default": {
-        "groupPolicy": "open",
-        "dmPolicy": "open",
-        "allowFrom": ["*"]
+        "groupPolicy": "allowlist",
+        "dmPolicy": "allowlist",
+        "allowFrom": $allowFrom
       }
     }
     + (if $aiAppId != "" and $aiAppSecret != "" then {
@@ -186,9 +320,9 @@ jq \
         "appId": $aiAppId,
         "appSecret": $aiAppSecret,
         "botName": $aiBotName,
-        "dmPolicy": "open",
-        "groupPolicy": "open",
-        "allowFrom": ["*"]
+        "dmPolicy": "allowlist",
+        "groupPolicy": "allowlist",
+        "allowFrom": $allowFrom
       }
     } else {} end)
   ) |
@@ -252,6 +386,7 @@ OPENCLAW_GROUP_ID=${GROUP_ID}
 OPENCLAW_PROJECT_DIR=${PROJECT_PATH}
 OPENCLAW_PROJECT_REPO=${PROJECT_REPO}
 OPENCLAW_CONFIG=${PROFILE_DIR}/openclaw.json
+WORKFLOW_TEMPLATE=${WORKFLOW_TEMPLATE_ID}
 CRON_GUARD_FEISHU_ACCOUNT=${FEISHU_HOT_ACCOUNT_ID}
 CRON_GUARD_FEISHU_TARGET=${GROUP_ID}
 RUNTIME_ENV
@@ -264,6 +399,12 @@ if ! "${ROOT_DIR}/scripts/install-cron.sh"; then
   echo "[WARN] cron sync failed (gateway unreachable or auth mismatch)." >&2
   echo "[WARN] you can run it later: bash scripts/install-cron.sh" >&2
 fi
+
+echo "[install] workflow template: ${WORKFLOW_TEMPLATE_ID}"
+
+INSTALL_COMPLETED=1
+trap - ERR
+rm -rf "${ROLLBACK_ROOT}"
 
 echo "[OK] install completed"
 echo "[next] run: bash scripts/start.sh"

@@ -66,12 +66,28 @@ start_bg() {
   echo "[start] ${name} started (pid=$(cat "${pid_file}"))"
 }
 
+repair_gateway_token_mismatch() {
+  local status_output
+  status_output="$(ocp gateway status 2>&1 || true)"
+  if printf '%s' "${status_output}" | tr '[:upper:]' '[:lower:]' | grep -Eq "gateway token mismatch|openclaw_gateway_token does not match"; then
+    echo "[start] detected gateway token mismatch, repairing gateway service"
+    ocp gateway stop >/dev/null 2>&1 || true
+    ocp gateway install --force >/dev/null 2>&1 || true
+    if ocp gateway start >/dev/null 2>&1; then
+      echo "[start] gateway token mismatch repaired"
+    else
+      echo "[WARN] gateway repair failed. Run: openclaw --profile ${OPENCLAW_PROFILE} doctor --fix"
+    fi
+  fi
+}
+
 # Ensure OpenClaw gateway LaunchAgent is installed, then start (for one-click deploy)
 # install is idempotent; start may fail if launchd not loaded (e.g. first boot)
 ocp gateway install >/dev/null 2>&1 || true
 if ! ocp gateway start 2>/dev/null; then
   echo "[WARN] gateway may not be running. If healthcheck fails, run: openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
 fi
+repair_gateway_token_mismatch
 
 REFRESH_INTERVAL="${REFRESH_INTERVAL:-300}"
 

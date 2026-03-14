@@ -22,6 +22,7 @@
 - **细粒度权限** 每角色 `tools.allow/deny` + `exec-approvals.json` 命令白名单
 - **Gateway 自愈** `watchdog.sh` 指数退避重启（60s→30min）+ 飞书告警
 - **日志轮转** 启动时自动清理超过 5MB 的日志
+- **控制面审计** apply/restart 结构化审计日志（JSONL）
 - **备份/恢复** `backup.sh` / `restore.sh` 一键归档配置与代理状态
 - **API 认证** 可选 Bearer Token 保护配置中心 API
 
@@ -90,6 +91,50 @@ DOMAIN=your-domain.com docker compose -f docker-compose.prod.yml up -d
 
 详见 [deploy/README.md](deploy/README.md)。
 
+## Release Strategy
+
+| 通道 | 当前版本 | 定位 | 维护策略 |
+|------|----------|------|----------|
+| LTS（稳定） | `v0.6.x` | 安全与可运营优先，适合生产长期运行 | 仅接收安全修复、稳定性修复、文档补丁 |
+| Latest（最新） | `v0.7.x` | 新能力优先，适合试点和功能验证 | 接收新特性，可能包含结构调整 |
+
+变更分级约定：
+- **兼容变更**：默认配置可继续运行，不要求迁移。
+- **破坏性变更**：必须在 `CHANGELOG.md` 里标记 `BREAKING` 并给出迁移步骤。
+
+## Upgrade Path
+
+### `v0.5.x -> v0.6.x`（兼容升级）
+
+```bash
+make backup
+git pull
+cp .env.example .env.example.latest
+# 对比新增变量（如 WORKFLOW_TEMPLATE / DASHBOARD_DATA_SLA_MINUTES / BACKUP_*）
+make install
+make start
+make health
+make check
+```
+
+### `v0.6.x -> v0.7.x`（可能含破坏性变更）
+
+```bash
+BACKUP_INCLUDE_TASK_SUMMARY=1 BACKUP_TASK_SUMMARY_DAYS=7 make backup
+git pull
+# 先阅读 CHANGELOG 的 BREAKING 与迁移章节
+make install
+make start
+make health
+```
+
+若升级后异常，可直接回退到最近备份：
+
+```bash
+make restore ARCHIVE=backups/<your-backup>.tar.gz
+make start
+```
+
 ## Makefile 命令
 
 | 命令 | 说明 |
@@ -122,6 +167,9 @@ DOMAIN=your-domain.com docker compose -f docker-compose.prod.yml up -d
 | `DISCORD_BOT_TOKEN` | 可选 | Discord Bot Token |
 | `CONTROL_TOKEN` | 可选 | 配置中心 API 认证 Token |
 | `REFRESH_INTERVAL` | 可选 | 驾驶舱刷新间隔（默认 300s） |
+| `OPENCLAW_ALLOW_NO_GH` | 可选 | 允许缺少 gh CLI 启动（GitHub 同步能力降级） |
+| `BACKUP_INCLUDE_TASK_SUMMARY` | 可选 | 备份时包含近 N 天任务摘要与审计日志（默认关闭） |
+| `BACKUP_TASK_SUMMARY_DAYS` | 可选 | 备份摘要窗口天数（默认 7） |
 
 ## Security
 

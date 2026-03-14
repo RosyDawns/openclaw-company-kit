@@ -1,0 +1,37 @@
+{
+  "jobs": [
+    {
+      "name": "模板-流程-晨会",
+      "agent": "rd-company",
+      "cron": "*/45 8-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《Bug告警分级》：按 P0/P1/P2 分类当前缺陷，给出影响范围、止血动作、负责人、截止时间。"
+    },
+    {
+      "name": "模板-流程-同步",
+      "agent": "role-senior-dev",
+      "cron": "*/30 8-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 900,
+      "thinking": "minimal",
+      "message": "你是高级程序员修复执行器。仅处理 __PROJECT_REPO__ 中高优先缺陷。每轮必须产出 commit/PR 或明确 blocked 原因，不得空转。"
+    },
+    {
+      "name": "模板-流程-复盘",
+      "agent": "role-qa-test",
+      "cron": "20,50 9-22 * * 1-5",
+      "tz": "Asia/Shanghai",
+      "account": "__HOT_ACCOUNT__",
+      "to": "__GROUP_ID__",
+      "timeoutSeconds": 420,
+      "thinking": "minimal",
+      "message": "执行《回归发布建议》：输出验证命令、结果、缺陷残留、是否建议发布。无测试证据不得建议发布。"
+    }
+  ]
+}

@@ -23,6 +23,10 @@ bash -n dashboard/rd-dashboard/issue-sync.sh
 bash -n docker/entrypoint.sh
 
 jq -e . templates/jobs.template.json >/dev/null
+jq -e . templates/workflow-jobs.default.json >/dev/null
+jq -e . templates/workflow-jobs.requirement-review.json >/dev/null
+jq -e . templates/workflow-jobs.bugfix.json >/dev/null
+jq -e . templates/workflow-jobs.release-retro.json >/dev/null
 jq -e . templates/company-project.template.json >/dev/null
 jq -e . templates/exec-approvals.template.json >/dev/null
 jq -e . docker/demo_data/dashboard-data.json >/dev/null
@@ -30,6 +34,7 @@ jq -e . docker/demo_data/business-metrics.json >/dev/null
 
 python3 -m py_compile dashboard/rd-dashboard/dashboard_data.py
 python3 -m py_compile scripts/control_server.py
+python3 -m unittest discover -s tests -p 'test_smoke_*.py' -v
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 echo "[OK] release checks passed"

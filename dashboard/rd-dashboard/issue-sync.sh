@@ -6,9 +6,11 @@ REPO_DIR="${REPO_DIR:-${OPENCLAW_PROJECT_DIR:-${HOME}/ai-agent-guide}}"
 REPO="${REPO:-${OPENCLAW_PROJECT_REPO:-owner/repo}}"
 DEFAULT_ASSIGNEE="${DEFAULT_ASSIGNEE:-${REPO%%/*}}"
 OPENCLAW_CONFIG="${OPENCLAW_CONFIG:-${OPENCLAW_STATE_DIR}/openclaw.json}"
-MILESTONE_TITLE="MVP Sprint W11"
-MILESTONE_DUE=""
-MILESTONE_DESC="MVP 冲刺周：核心稳定性、安全与增长基础能力"
+MILESTONE_TITLE="${MILESTONE_TITLE:-${ISSUE_SYNC_MILESTONE_TITLE:-}}"
+MILESTONE_DUE="${MILESTONE_DUE:-${ISSUE_SYNC_MILESTONE_DUE:-}}"
+MILESTONE_DESC="${MILESTONE_DESC:-${ISSUE_SYNC_MILESTONE_DESC:-MVP 冲刺周：核心稳定性、安全与增长基础能力}}"
+SPRINT_LABEL="${SPRINT_LABEL:-${ISSUE_SYNC_SPRINT_LABEL:-}}"
+SPRINT_NAME="${SPRINT_NAME:-${ISSUE_SYNC_SPRINT_NAME:-}}"
 MAX_RETRIES=3
 RETRY_DELAY=2
 LOG_PREFIX="[issue-sync]"
@@ -22,11 +24,11 @@ CRON_JOBS_FILE="${CRON_JOBS_FILE:-${OPENCLAW_STATE_DIR}/cron/jobs.json}"
 CRON_GUARD_STATE_FILE="${CRON_GUARD_STATE_FILE:-${OPENCLAW_STATE_DIR}/workspace/rd-dashboard/reports/cron-guard-state.json}"
 SYNC_LOCK_DIR="${SYNC_LOCK_DIR:-${OPENCLAW_STATE_DIR}/workspace/rd-dashboard/.issue-sync.lock}"
 SYNC_LOCK_PID_FILE="${SYNC_LOCK_DIR}/pid"
-CRON_GUARD_TARGET_JOB_ID="e1e8bb42-bf53-4a6b-925d-47804bcb4d72"
-CRON_PIPELINE_TECH_JOB_ID="b6176298-dced-45f8-8c0f-8c0b3ec0dd98"
-CRON_PIPELINE_PRODUCT_JOB_ID="8cd2277b-f3e2-4bdb-920c-1afa2ecd9fee"
-CRON_PIPELINE_REVIEWER_JOB_ID="23d1c9c1-91a6-4bfa-93fe-34cba20484e4"
-CRON_PIPELINE_QA_JOB_ID="2972505e-921d-4182-863d-ef7f048b8374"
+CRON_GUARD_TARGET_JOB_ID="${CRON_GUARD_TARGET_JOB_ID:-e1e8bb42-bf53-4a6b-925d-47804bcb4d72}"
+CRON_PIPELINE_TECH_JOB_ID="${CRON_PIPELINE_TECH_JOB_ID:-b6176298-dced-45f8-8c0f-8c0b3ec0dd98}"
+CRON_PIPELINE_PRODUCT_JOB_ID="${CRON_PIPELINE_PRODUCT_JOB_ID:-8cd2277b-f3e2-4bdb-920c-1afa2ecd9fee}"
+CRON_PIPELINE_REVIEWER_JOB_ID="${CRON_PIPELINE_REVIEWER_JOB_ID:-23d1c9c1-91a6-4bfa-93fe-34cba20484e4}"
+CRON_PIPELINE_QA_JOB_ID="${CRON_PIPELINE_QA_JOB_ID:-2972505e-921d-4182-863d-ef7f048b8374}"
 CRON_GUARD_FEISHU_ACCOUNT="${CRON_GUARD_FEISHU_ACCOUNT:-hot-search}"
 CRON_GUARD_FEISHU_TARGET="${CRON_GUARD_FEISHU_TARGET:-oc_replace_with_group_id}"
 AUTO_MERGE_ENABLED="${AUTO_MERGE_ENABLED:-1}"
@@ -448,8 +450,18 @@ DUE_2="$(business_day_offset "${TODAY_CST}" 2)"
 DUE_3="$(business_day_offset "${TODAY_CST}" 3)"
 DUE_4="$(business_day_offset "${TODAY_CST}" 4)"
 DUE_5="$(business_day_offset "${TODAY_CST}" 5)"
-MILESTONE_DUE_DATE="$(business_day_offset "${TODAY_CST}" 6)"
-MILESTONE_DUE="${MILESTONE_DUE_DATE}T00:00:00Z"
+CURRENT_WEEK="$(TZ=Asia/Shanghai date '+%V' | sed 's/^0//')"
+[ -n "${CURRENT_WEEK}" ] || CURRENT_WEEK="1"
+[ -n "${SPRINT_LABEL}" ] || SPRINT_LABEL="sprint:w${CURRENT_WEEK}"
+[ -n "${SPRINT_NAME}" ] || SPRINT_NAME="W${CURRENT_WEEK} 冲刺"
+[ -n "${MILESTONE_TITLE}" ] || MILESTONE_TITLE="MVP Sprint W${CURRENT_WEEK}"
+if [ -n "${MILESTONE_DUE}" ]; then
+  MILESTONE_DUE_DATE="${MILESTONE_DUE%%T*}"
+  [ -n "${MILESTONE_DUE_DATE}" ] || MILESTONE_DUE_DATE="${TODAY_CST}"
+else
+  MILESTONE_DUE_DATE="$(business_day_offset "${TODAY_CST}" 6)"
+  MILESTONE_DUE="${MILESTONE_DUE_DATE}T00:00:00Z"
+fi
 
 ensure_label() {
   local name="$1"
@@ -465,7 +477,7 @@ ensure_labels() {
   ensure_label "status:doing" "FBCA04" "进行中"
   ensure_label "status:blocked" "B60205" "阻塞中"
   ensure_label "status:done" "1A7F37" "已完成"
-  ensure_label "sprint:w11" "1D76DB" "W11 冲刺"
+  ensure_label "${SPRINT_LABEL}" "1D76DB" "${SPRINT_NAME}"
   ensure_label "owner:role-senior-dev" "5319E7" "负责人：高级程序员"
   ensure_label "owner:role-product" "FBCA04" "负责人：产品经理"
   ensure_label "owner:role-qa-test" "C2E0C6" "负责人：测试"
@@ -853,8 +865,12 @@ ensure_status_evidence_comment() {
   local to_status="$4"
   local reason="$5"
   local evidence="$6"
+  local evidence_type="$7"
+  local evidence_url="$8"
   local exists
   local ts
+  local issue_url
+  local evidence_json
   local body
 
   exists="$(gh_retry issue view "${number}" --repo "${REPO}" --json comments --jq "[.comments[].body | contains(\"[AUTO-STATUS] ${marker}\")] | any")"
@@ -862,8 +878,17 @@ ensure_status_evidence_comment() {
     return 0
   fi
 
+  issue_url="https://github.com/${REPO}/issues/${number}"
+  [ -n "${evidence_type}" ] || evidence_type="issue"
+  [ -n "${evidence_url}" ] || evidence_url="${issue_url}"
   ts="$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')"
-  body=$'[AUTO-STATUS] '"${marker}"$'\n- Transition: '"${from_status}"$' -> '"${to_status}"$'\n- Reason: '"${reason}"$'\n- Evidence: '"${evidence}"$'\n- SyncedAt: '"${ts}"
+  evidence_json="$(jq -cn \
+    --arg issueUrl "${issue_url}" \
+    --arg evidenceType "${evidence_type}" \
+    --arg evidenceUrl "${evidence_url}" \
+    --arg syncedAt "${ts}" \
+    '{issueUrl: $issueUrl, evidenceType: $evidenceType, evidenceUrl: $evidenceUrl, syncedAt: $syncedAt}')"
+  body=$'[AUTO-STATUS] '"${marker}"$'\n- Transition: '"${from_status}"$' -> '"${to_status}"$'\n- Reason: '"${reason}"$'\n- Evidence: '"${evidence}"$'\n- EvidenceType: '"${evidence_type}"$'\n- EvidenceURL: '"${evidence_url}"$'\n- IssueURL: '"${issue_url}"$'\n- SyncedAt: '"${ts}"$'\n[AUTO-EVIDENCE] '"${evidence_json}"
   gh_retry issue comment "${number}" --repo "${REPO}" --body "${body}" >/dev/null
   log "issue #${number} status-evidence comment added (${marker})"
 }
@@ -880,6 +905,9 @@ auto_reconcile_issue_status() {
   local target
   local reason
   local evidence
+  local evidence_type
+  local evidence_url
+  local issue_url
   local marker
   local merged_line
   local merged_issue
@@ -912,6 +940,9 @@ auto_reconcile_issue_status() {
   current_primary="${current_statuses%%,*}"
   reason=""
   evidence=""
+  evidence_type="issue"
+  issue_url="https://github.com/${REPO}/issues/${number}"
+  evidence_url="${issue_url}"
   marker=""
 
   if [ "${issue_state}" = "closed" ] || issue_has_merged_pr_reference "${number}"; then
@@ -919,6 +950,8 @@ auto_reconcile_issue_status() {
     if [ "${issue_state}" = "closed" ]; then
       reason="issue state is closed"
       evidence="issue state=closed"
+      evidence_type="issue"
+      evidence_url="${issue_url}"
       marker="issue-closed"
     else
       merged_line="$(get_merged_pr_evidence_line "${number}")"
@@ -929,12 +962,16 @@ EOF
       fi
       reason="detected merged PR reference"
       evidence="pr #${merged_pr_num:-unknown} ${merged_pr_url:-}"
+      evidence_type="pr"
+      evidence_url="${merged_pr_url:-${issue_url}}"
       marker="merged-pr-${merged_pr_num:-unknown}"
     fi
   elif echo "${current_statuses}" | grep -Fq "status:blocked"; then
     target="status:blocked"
     reason="issue explicitly labeled as blocked"
     evidence="status label contains status:blocked"
+    evidence_type="issue"
+    evidence_url="${issue_url}"
     marker="blocked-label"
   elif issue_has_open_pr_reference "${number}"; then
     target="status:doing"
@@ -946,6 +983,8 @@ EOF
     fi
     reason="detected open PR reference"
     evidence="pr #${open_pr_num:-unknown} ${open_pr_url:-}"
+    evidence_type="pr"
+    evidence_url="${open_pr_url:-${issue_url}}"
     marker="open-pr-${open_pr_num:-unknown}"
   elif issue_has_commit_reference "${number}"; then
     target="status:doing"
@@ -957,6 +996,8 @@ EOF
     fi
     reason="detected commit reference"
     evidence="commit ${commit_sha:-unknown} ${commit_url:-}"
+    evidence_type="commit"
+    evidence_url="${commit_url:-${issue_url}}"
     marker="commit-ref-${commit_sha:-unknown}"
   elif [ "${non_code_mode}" = "true" ]; then
     if issue_has_non_code_evidence "${number}"; then
@@ -964,17 +1005,23 @@ EOF
       non_code_evidence_body="$(get_non_code_evidence_line "${number}")"
       reason="detected non-code evidence marker"
       evidence="$(printf '%s' "${non_code_evidence_body}" | tr '\n' ' ' | cut -c1-160)"
+      evidence_type="comment"
+      evidence_url="${issue_url}"
       marker="non-code-evidence"
     else
       target="status:todo"
       reason="non-code issue without evidence marker"
       evidence="missing [NON-CODE-EVIDENCE] comment"
+      evidence_type="comment"
+      evidence_url="${issue_url}"
       marker="non-code-no-evidence"
     fi
   elif echo "${priority_labels}" | grep -Eq 'priority:p0|priority:p1'; then
     target="status:todo"
     reason="high-priority issue without execution evidence"
     evidence="labels=${priority_labels}; missing open-pr/commit-ref"
+    evidence_type="issue"
+    evidence_url="${issue_url}"
     marker="priority-no-evidence"
   else
     target="status:todo"
@@ -984,15 +1031,21 @@ EOF
     if echo "${owner_labels}" | tr ',' '\n' | grep -qx "owner:role-senior-dev"; then
       reason="senior-dev issue has no open PR/commit evidence"
       evidence="previous status=doing; no execution evidence"
+      evidence_type="issue"
+      evidence_url="${issue_url}"
       marker="no-exec-evidence"
     elif [ "${non_code_mode}" = "true" ]; then
       reason="non-code issue has no [NON-CODE-EVIDENCE] marker"
       evidence="previous status=doing; missing [NON-CODE-EVIDENCE]"
+      evidence_type="comment"
+      evidence_url="${issue_url}"
       marker="no-non-code-evidence"
     else
       target="status:doing"
       reason="anti-regression: keep doing unless blocked/done evidence appears"
       evidence="previous status=doing"
+      evidence_type="issue"
+      evidence_url="${issue_url}"
       marker="anti-regression-keep-doing"
     fi
   fi
@@ -1011,12 +1064,22 @@ EOF
         "${current_primary:-status:none}" \
         "${target}" \
         "open PR reference disappeared (closed/unlinked), rollback to todo" \
-        "last seen ${latest_open_marker}"
+        "last seen ${latest_open_marker}" \
+        "pr" \
+        "${issue_url}"
     fi
   fi
 
   if [ -n "${marker}" ]; then
-    ensure_status_evidence_comment "${number}" "${marker}" "${current_primary:-status:none}" "${target}" "${reason}" "${evidence}"
+    ensure_status_evidence_comment \
+      "${number}" \
+      "${marker}" \
+      "${current_primary:-status:none}" \
+      "${target}" \
+      "${reason}" \
+      "${evidence}" \
+      "${evidence_type}" \
+      "${evidence_url}"
   fi
 }
 
@@ -1081,7 +1144,7 @@ sync_issue_metadata() {
   local schedule="$4"
   local labels_csv
 
-  labels_csv="${priority},sprint:w11,${owners_csv}"
+  labels_csv="${priority},${SPRINT_LABEL},${owners_csv}"
   gh_retry issue edit "${number}" --repo "${REPO}" --add-assignee "${DEFAULT_ASSIGNEE}" --milestone "${MILESTONE_TITLE}" --add-label "${labels_csv}" >/dev/null
 
   ensure_status_label "${number}"

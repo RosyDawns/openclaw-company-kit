@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.6.0 - 2026-03-14
+
+### Security & Reliability
+- Removed `eval` path expansion risks in shell scripts and removed `shell=True` execution path in dashboard data builder.
+- Tightened default incoming message source policy (`FEISHU_ALLOW_FROM` secure default).
+- Control API now enforces token-based auth by default (ephemeral fallback token when unset).
+- Added install rollback safeguards and clearer failure diagnostics.
+- Added setup/dashboard XSS hardening: high-risk dynamic rendering switched to safe DOM rendering.
+
+### Operability
+- Added control task metrics (7d) and dashboard visualization (success rate, failure distribution, duration trend).
+- Added GitHub tracker performance layer (TTL cache + API budget + stale fallback) and issue schedule cache.
+- Added health SLA classification (`gateway_fault` / `data_lag` / `github_rate_limit`) and watchdog remediation mapping.
+- Added workflow template packages (`default`, `requirement-review`, `bugfix`, `release-retro`) with one-click apply.
+- Added role evidence chain view (Issue/PR/Commit/Comment URL + time) in dashboard role pages.
+
+### Quality & Audit
+- Added control API smoke tests in CI and release-check workflow.
+- Added structured control audit log (`control-audit-log.jsonl`) for `apply/restart` step lifecycle.
+- Added optional backup bundle for recent control task summary/history (`BACKUP_INCLUDE_TASK_SUMMARY`, `BACKUP_TASK_SUMMARY_DAYS`).
+
+### Compatibility & Upgrade Notes
+- Compatibility: `0.5.x -> 0.6.x` is backward-compatible by default.
+- New optional env keys:
+  - `WORKFLOW_TEMPLATE`
+  - `DASHBOARD_DATA_SLA_MINUTES`
+  - `OPENCLAW_GITHUB_TRACKER_CACHE_TTL_SEC`
+  - `OPENCLAW_GITHUB_ISSUE_SCHEDULE_CACHE_TTL_SEC`
+  - `OPENCLAW_GITHUB_ISSUE_EVIDENCE_CACHE_TTL_SEC`
+  - `OPENCLAW_GITHUB_API_BUDGET`
+  - `BACKUP_INCLUDE_TASK_SUMMARY`
+  - `BACKUP_TASK_SUMMARY_DAYS`
+- BREAKING: none.
+
 ## 0.5.0 - 2026-03-12
 
 ### P4 — Reliability & Completeness

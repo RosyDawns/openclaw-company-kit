@@ -15,7 +15,11 @@ HEALTH_STATE_DIR="${PROFILE_DIR}/run"
 LOG_DIR="${PROFILE_DIR}/logs"
 LOG_FILE="${LOG_DIR}/watchdog.log"
 RESTART_COUNT_FILE="${HEALTH_STATE_DIR}/watchdog_restart_count"
+HEALTH_SUMMARY_FILE="${HEALTH_STATE_DIR}/healthcheck-summary.json"
+ALERT_THROTTLE_SEC="${WATCHDOG_ALERT_THROTTLE_SEC:-600}"
+ALERT_STAMP_DIR="${HEALTH_STATE_DIR}/watchdog-alerts"
 mkdir -p "${HEALTH_STATE_DIR}" "${LOG_DIR}"
+mkdir -p "${ALERT_STAMP_DIR}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"; }
 
@@ -32,6 +36,46 @@ notify_feishu() {
       --to "${CRON_GUARD_FEISHU_TARGET}" \
       --text "[Watchdog] ${msg}" 2>/dev/null || log "feishu notify failed (non-fatal)"
   fi
+}
+
+sanitize_key() {
+  printf '%s' "$1" | tr -c 'A-Za-z0-9_.-' '_'
+}
+
+should_notify_alert() {
+  local key="$1"
+  local safe_key
+  local now_ts
+  local stamp_file
+  local last_ts
+
+  safe_key="$(sanitize_key "${key}")"
+  stamp_file="${ALERT_STAMP_DIR}/${safe_key}.ts"
+  now_ts="$(date +%s)"
+  last_ts="$(cat "${stamp_file}" 2>/dev/null || echo 0)"
+
+  if [[ "${last_ts}" =~ ^[0-9]+$ ]] && [ $((now_ts - last_ts)) -lt "${ALERT_THROTTLE_SEC}" ]; then
+    return 1
+  fi
+
+  printf '%s\n' "${now_ts}" > "${stamp_file}"
+  return 0
+}
+
+refresh_dashboard_data_once() {
+  if [ ! -x "${TARGET_DASHBOARD_DIR}/refresh.sh" ]; then
+    return 1
+  fi
+  (cd "${TARGET_DASHBOARD_DIR}" && ./refresh.sh >/dev/null 2>&1)
+}
+
+detect_gateway_token_mismatch() {
+  local status_output
+  status_output="$(ocp gateway status 2>&1 || true)"
+  if printf '%s' "${status_output}" | tr '[:upper:]' '[:lower:]' | grep -Eq "gateway token mismatch|openclaw_gateway_token does not match"; then
+    return 0
+  fi
+  return 1
 }
 
 restart_gateway() {
@@ -51,7 +95,11 @@ restart_gateway() {
 
   log "attempting restart #$((count + 1)) (backoff=${backoff}s)"
 
-  ocp gateway install >/dev/null 2>&1 || true
+  if detect_gateway_token_mismatch; then
+    log "gateway token mismatch detected, applying stop/install --force/start repair"
+    ocp gateway stop >/dev/null 2>&1 || true
+  fi
+  ocp gateway install --force >/dev/null 2>&1 || true
   ocp gateway start >/dev/null 2>&1 || true
 
   echo $((count + 1)) > "${RESTART_COUNT_FILE}"
@@ -72,12 +120,50 @@ while true; do
   else
     exit_code=$?
     fail_count=$(cat "${HEALTH_STATE_DIR}/gateway_fail_count" 2>/dev/null || echo 0)
-    log "health check failed (exit=${exit_code}, consecutive_fails=${fail_count})"
+    categories=""
+    should_restart_gateway="false"
+    gateway_action=""
+    data_lag_action=""
+    rate_limit_action=""
 
-    if [ "${exit_code}" -ge 2 ]; then
+    if [ -f "${HEALTH_SUMMARY_FILE}" ]; then
+      categories="$(jq -r '[.classifications[].category] | unique | join(",")' "${HEALTH_SUMMARY_FILE}" 2>/dev/null || echo "")"
+      should_restart_gateway="$(jq -r '.shouldRestartGateway // false' "${HEALTH_SUMMARY_FILE}" 2>/dev/null || echo "false")"
+      gateway_action="$(jq -r '.classifications[] | select(.category == "gateway_fault") | .action' "${HEALTH_SUMMARY_FILE}" 2>/dev/null | head -n1 || true)"
+      data_lag_action="$(jq -r '.classifications[] | select(.category == "data_lag") | .action' "${HEALTH_SUMMARY_FILE}" 2>/dev/null | head -n1 || true)"
+      rate_limit_action="$(jq -r '.classifications[] | select(.category == "github_rate_limit") | .action' "${HEALTH_SUMMARY_FILE}" 2>/dev/null | head -n1 || true)"
+    fi
+
+    log "health check failed (exit=${exit_code}, consecutive_fails=${fail_count}, categories=${categories:-unknown})"
+
+    if [ "${should_restart_gateway}" = "true" ]; then
       log "gateway critical failure detected"
-      notify_feishu "⚠️ Gateway 故障（连续 ${fail_count} 次），正在自动重启..."
+      if should_notify_alert "gateway_fault"; then
+        notify_feishu "⚠️ Gateway 故障（连续 ${fail_count} 次），正在自动重启... 建议：${gateway_action:-检查 openclaw gateway 进程状态}"
+      fi
       restart_gateway || true
+      continue
+    fi
+
+    if printf '%s' "${categories}" | grep -q "data_lag"; then
+      if refresh_dashboard_data_once; then
+        log "data lag detected, triggered one-shot dashboard refresh"
+      fi
+      if should_notify_alert "data_lag"; then
+        notify_feishu "⚠️ Dashboard 数据滞后，建议：${data_lag_action:-执行 refresh.sh 并检查 dashboard-refresh-loop}"
+      fi
+      continue
+    fi
+
+    if printf '%s' "${categories}" | grep -q "github_rate_limit"; then
+      if should_notify_alert "github_rate_limit"; then
+        notify_feishu "⚠️ GitHub 接口限流/预算降级，建议：${rate_limit_action:-提高缓存 TTL 或 API 预算并稍后重试}"
+      fi
+      continue
+    fi
+
+    if [ "${exit_code}" -gt 0 ] && should_notify_alert "health_generic"; then
+      notify_feishu "⚠️ 健康检查异常（exit=${exit_code}），请执行 bash scripts/healthcheck.sh 查看分类详情"
     fi
   fi
   sleep "${CHECK_INTERVAL}"

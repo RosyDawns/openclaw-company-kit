@@ -16,6 +16,7 @@ load_env() {
   COMPANY_NAME="${COMPANY_NAME:-OpenClaw Company}"
   PROJECT_PATH="${PROJECT_PATH:-/path/to/your-project}"
   PROJECT_REPO="${PROJECT_REPO:-your-org/your-repo}"
+  WORKFLOW_TEMPLATE="${WORKFLOW_TEMPLATE:-default}"
 
   GROUP_ID="${GROUP_ID:-}"
 
@@ -23,6 +24,7 @@ load_env() {
   FEISHU_HOT_BOT_NAME="${FEISHU_HOT_BOT_NAME:-小龙虾 1 号}"
   FEISHU_HOT_APP_ID="${FEISHU_HOT_APP_ID:-}"
   FEISHU_HOT_APP_SECRET="${FEISHU_HOT_APP_SECRET:-}"
+  FEISHU_ALLOW_FROM="${FEISHU_ALLOW_FROM:-}"
 
   FEISHU_AI_ACCOUNT_ID="${FEISHU_AI_ACCOUNT_ID:-ai-tech}"
   FEISHU_AI_BOT_NAME="${FEISHU_AI_BOT_NAME:-小龙虾 2 号}"
@@ -43,6 +45,8 @@ load_env() {
   DISCORD_CHANNEL_ID="${DISCORD_CHANNEL_ID:-}"
 
   DASHBOARD_PORT="${DASHBOARD_PORT:-8788}"
+  OPENCLAW_NODE_MIN_MAJOR="${OPENCLAW_NODE_MIN_MAJOR:-22}"
+  OPENCLAW_ALLOW_NO_GH="${OPENCLAW_ALLOW_NO_GH:-0}"
 
   if [ "${OPENCLAW_PROFILE}" = "default" ] || [ "${OPENCLAW_PROFILE}" = "main" ]; then
     PROFILE_DIR="${HOME}/.openclaw"
@@ -68,12 +72,42 @@ required_var() {
 
 check_cmds() {
   local missing=0
-  for c in openclaw jq python3 rsync gh; do
+  local raw
+  local major
+  local min_major="${OPENCLAW_NODE_MIN_MAJOR:-22}"
+  local gh_optional="${OPENCLAW_ALLOW_NO_GH:-0}"
+
+  for c in openclaw node jq python3 rsync; do
     if ! command -v "${c}" >/dev/null 2>&1; then
       echo "[ERROR] missing command: ${c}" >&2
       missing=1
     fi
   done
+
+  if ! command -v gh >/dev/null 2>&1; then
+    if [ "${gh_optional}" = "1" ]; then
+      echo "[WARN] missing command: gh (OPENCLAW_ALLOW_NO_GH=1, GitHub sync features will be degraded)"
+    else
+      echo "[ERROR] missing command: gh" >&2
+      echo "        install gh: brew install gh (macOS) / sudo apt install gh (Ubuntu)" >&2
+      echo "        temp bypass: OPENCLAW_ALLOW_NO_GH=1 bash scripts/launch.sh" >&2
+      missing=1
+    fi
+  fi
+
+  if command -v node >/dev/null 2>&1; then
+    raw="$(node -v 2>/dev/null | head -n1)"
+    major="${raw#v}"
+    major="${major%%.*}"
+    if ! [[ "${major}" =~ ^[0-9]+$ ]]; then
+      echo "[ERROR] failed to parse node version: ${raw}" >&2
+      missing=1
+    elif [ "${major}" -lt "${min_major}" ]; then
+      echo "[ERROR] node version ${raw} is below required major ${min_major}" >&2
+      missing=1
+    fi
+  fi
+
   if [ "${missing}" -ne 0 ]; then
     exit 1
   fi
@@ -93,11 +127,17 @@ sed_inplace() {
 
 expand_tilde_path() {
   local p="$1"
-  if [[ "${p}" == ~* ]]; then
-    eval "echo ${p}"
-  else
-    echo "${p}"
-  fi
+  case "${p}" in
+    "~")
+      printf '%s\n' "${HOME}"
+      ;;
+    "~/"*)
+      printf '%s\n' "${HOME}/${p#\~/}"
+      ;;
+    *)
+      printf '%s\n' "${p}"
+      ;;
+  esac
 }
 
 now_local() {

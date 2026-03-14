@@ -20,3 +20,5 @@ If secrets were exposed:
 - Use least-privilege GitHub token scopes
 - Use dedicated Feishu app per environment
 - Isolate profile with `OPENCLAW_PROFILE`
+- Restrict Feishu sender scope via `FEISHU_ALLOW_FROM` (defaults to `GROUP_ID` only if unset)
+- Set `CONTROL_TOKEN` in `.env` to avoid ephemeral token rotation on each setup-server restart
