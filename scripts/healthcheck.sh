@@ -199,16 +199,39 @@ PY
 echo "=== Gateway Status (${OPENCLAW_PROFILE}) ==="
 gateway_reachable="false"
 gateway_error=""
-gateway_status_raw="$(ocp gateway status 2>&1 || true)"
-gateway_status_lc="$(printf '%s' "${gateway_status_raw}" | tr '[:upper:]' '[:lower:]')"
-if printf '%s' "${gateway_status_lc}" | grep -q "rpc probe: ok"; then
-  gateway_reachable="true"
-else
-  gateway_error="$(printf '%s' "${gateway_status_raw}" | awk '
-    BEGIN { err="" }
-    /missing scope|token mismatch|gateway closed|connect failed|RPC probe: failed|not listening/ { err=$0 }
-    END { print err }
-  ')"
+gateway_raw="$(ocp status --all --json 2>/dev/null || true)"
+gateway_json="$(printf '%s' "${gateway_raw}" | extract_json_payload 2>/dev/null || true)"
+if [ -n "${gateway_json}" ]; then
+  gateway_reachable="$(printf '%s' "${gateway_json}" | jq -r '.gateway.reachable // false' 2>/dev/null || echo false)"
+  gateway_error="$(printf '%s' "${gateway_json}" | jq -r '.gateway.error // ""' 2>/dev/null || true)"
+fi
+
+if [ "${gateway_reachable}" != "true" ] && [ -n "${gateway_error}" ]; then
+  gateway_error_lc_probe="$(printf '%s' "${gateway_error}" | tr '[:upper:]' '[:lower:]')"
+  if printf '%s' "${gateway_error_lc_probe}" | grep -Eq "missing scope|device identity required"; then
+    # Some OpenClaw builds report backend probe auth-scope errors even when
+    # CLI-mode gateway calls are healthy. Verify once using gateway call.
+    gateway_call_raw="$(ocp gateway call status --json 2>/dev/null || true)"
+    gateway_call_json="$(printf '%s' "${gateway_call_raw}" | extract_json_payload 2>/dev/null || true)"
+    if [ -n "${gateway_call_json}" ]; then
+      gateway_reachable="true"
+      gateway_error=""
+    fi
+  fi
+fi
+
+if [ "${gateway_reachable}" != "true" ] && [ -z "${gateway_error}" ]; then
+  gateway_status_raw="$(ocp gateway status 2>&1 || true)"
+  gateway_status_lc="$(printf '%s' "${gateway_status_raw}" | tr '[:upper:]' '[:lower:]')"
+  if printf '%s' "${gateway_status_lc}" | grep -q "rpc probe: ok"; then
+    gateway_reachable="true"
+  else
+    gateway_error="$(printf '%s' "${gateway_status_raw}" | awk '
+      BEGIN { err="" }
+      /missing scope|token mismatch|gateway closed|connect failed|RPC probe: failed|not listening/ { err=$0 }
+      END { print err }
+    ')"
+  fi
 fi
 if [ "${gateway_reachable}" = "true" ]; then
   echo "gateway: responsive"
