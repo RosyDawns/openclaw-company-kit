@@ -8,6 +8,13 @@ source "${ROOT_DIR}/scripts/_common.sh"
 
 load_env
 DEFAULT_PORT="${DASHBOARD_PORT:-8788}"
+LAUNCH_PORT="${LAUNCH_PORT:-}"
+LAUNCH_PROMPT_PORT="${LAUNCH_PROMPT_PORT:-0}"
+LAUNCH_PORT_SCAN_LIMIT="${LAUNCH_PORT_SCAN_LIMIT:-20}"
+IS_INTERACTIVE=0
+if [ -t 0 ] && [ -t 1 ]; then
+  IS_INTERACTIVE=1
+fi
 
 echo "环境检测："
 check_cmds
@@ -55,9 +62,22 @@ is_control_server_running() {
       return 0
       ;;
     *)
-      return 1
       ;;
   esac
+
+  # Fallback: detect control_server.py listener by process args.
+  if command -v lsof >/dev/null 2>&1 && command -v ps >/dev/null 2>&1; then
+    local pid args
+    pid="$(lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"
+    if [ -n "${pid}" ]; then
+      args="$(ps -p "${pid}" -o args= 2>/dev/null || true)"
+      if printf '%s' "${args}" | grep -q 'scripts/control_server.py'; then
+        return 0
+      fi
+    fi
+  fi
+
+  return 1
 }
 
 print_port_listener() {
@@ -78,6 +98,36 @@ list_port_listener_pids() {
   if command -v lsof >/dev/null 2>&1; then
     lsof -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true
   fi
+}
+
+find_next_available_port() {
+  local current="$1"
+  local limit="$2"
+  local candidate
+  local steps=0
+
+  candidate="$current"
+  while [ "$steps" -lt "$limit" ]; do
+    if [ "$candidate" -lt 65535 ]; then
+      candidate="$((candidate + 1))"
+    else
+      return 1
+    fi
+
+    if is_control_server_running "$candidate"; then
+      echo "$candidate"
+      return 0
+    fi
+
+    if ! is_port_in_use "$candidate"; then
+      echo "$candidate"
+      return 0
+    fi
+
+    steps="$((steps + 1))"
+  done
+
+  return 1
 }
 
 confirm_stop_occupied_port() {
@@ -141,9 +191,17 @@ stop_port_listener() {
   return 1
 }
 
-port=""
-read -r -p "Dashboard/Setup port [${DEFAULT_PORT}]: " port || true
-port="${port:-$DEFAULT_PORT}"
+port="${LAUNCH_PORT:-$DEFAULT_PORT}"
+
+if [ "${LAUNCH_PROMPT_PORT}" = "1" ] && [ "${IS_INTERACTIVE}" -eq 1 ]; then
+  port_input=""
+  read -r -p "Dashboard/Setup port [${port}]: " port_input || true
+  if [ -n "${port_input}" ]; then
+    port="${port_input}"
+  fi
+else
+  echo "[launch] using port ${port} (set LAUNCH_PROMPT_PORT=1 to prompt)"
+fi
 
 if ! [[ "$port" =~ ^[0-9]+$ ]]; then
   echo "[ERROR] port must be a number" >&2
@@ -156,25 +214,38 @@ if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
 fi
 
 while is_port_in_use "$port"; do
-  port_has_control_server=0
   if is_control_server_running "$port"; then
-    port_has_control_server=1
     echo "[WARN] config server is already running on this port: http://127.0.0.1:${port}/setup"
+    echo "[launch] keeping existing config server: http://127.0.0.1:${port}/setup"
+    exit 0
   fi
 
   echo "[WARN] port ${port} is already in use."
   print_port_listener "$port"
 
-  if confirm_stop_occupied_port "${port}"; then
-    if stop_port_listener "${port}"; then
+  if [ "${IS_INTERACTIVE}" -eq 1 ]; then
+    if confirm_stop_occupied_port "${port}"; then
+      if stop_port_listener "${port}"; then
+        continue
+      fi
+      echo "[WARN] unable to free port ${port}; choose another port."
+    fi
+  fi
+
+  if [ "${IS_INTERACTIVE}" -ne 1 ]; then
+    auto_port="$(find_next_available_port "$port" "$LAUNCH_PORT_SCAN_LIMIT" || true)"
+    if [ -n "${auto_port}" ]; then
+      if is_control_server_running "${auto_port}"; then
+        echo "[WARN] config server is already running on auto-selected port: http://127.0.0.1:${auto_port}/setup"
+        echo "[launch] keeping existing config server: http://127.0.0.1:${auto_port}/setup"
+        exit 0
+      fi
+      echo "[launch] port ${port} occupied; auto-selected free port ${auto_port}"
+      port="${auto_port}"
       continue
     fi
-    echo "[WARN] unable to free port ${port}; choose another port."
-  else
-    if [ "${port_has_control_server}" -eq 1 ]; then
-      echo "[launch] keeping existing config server: http://127.0.0.1:${port}/setup"
-      exit 0
-    fi
+    echo "[ERROR] no available port found after ${LAUNCH_PORT_SCAN_LIMIT} attempts from ${port}" >&2
+    exit 1
   fi
 
   suggest_port="${port}"
