@@ -231,12 +231,16 @@ case "${action}" in
     write_ok_url "${url}"
     ;;
 
-  set_labels)
+  set_labels|update_issue)
     number="$(jq -r '.number // empty' "${REQ_FILE}")"
     add_csv="$(jq -r '.add // [] | map(tostring) | join(",")' "${REQ_FILE}")"
     remove_csv="$(jq -r '.remove // [] | map(tostring) | join(",")' "${REQ_FILE}")"
+    title_has="$(jq -r 'has("title")' "${REQ_FILE}")"
+    body_has="$(jq -r 'has("body")' "${REQ_FILE}")"
+    title="$(jq -r '.title // empty' "${REQ_FILE}")"
+    body="$(jq -r '.body // empty' "${REQ_FILE}")"
     if [ -z "${number}" ]; then
-      write_error "missing number for set_labels"
+      write_error "missing number for ${action}"
       echo "${RESP_FILE}"
       exit 0
     fi
@@ -246,9 +250,15 @@ case "${action}" in
     if [ -n "${remove_csv}" ]; then
       run_or_error gh issue edit "${number}" --repo "${repo}" --remove-label "${remove_csv}" >/dev/null
     fi
+    if [ "${title_has}" = "true" ]; then
+      run_or_error gh issue edit "${number}" --repo "${repo}" --title "${title}" >/dev/null
+    fi
+    if [ "${body_has}" = "true" ]; then
+      run_or_error gh issue edit "${number}" --repo "${repo}" --body "${body}" >/dev/null
+    fi
     data="$(run_or_error gh issue view "${number}" --repo "${repo}" --json number,title,state,url,labels)"
     if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
-      write_error "unexpected non-json response from gh issue view after set_labels: ${data}"
+      write_error "unexpected non-json response from gh issue view after ${action}: ${data}"
       echo "${RESP_FILE}"
       exit 0
     fi
