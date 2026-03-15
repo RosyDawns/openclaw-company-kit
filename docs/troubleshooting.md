@@ -35,6 +35,20 @@ openclaw --profile <profile> gateway install --force
 openclaw --profile <profile> gateway start
 ```
 
+If `bash scripts/healthcheck.sh` reports `missing scope: operator.read`:
+
+```bash
+# 1) Repair gateway/client auth scopes
+openclaw --profile <profile> doctor --fix --non-interactive --yes
+
+# 2) Restart gateway service
+openclaw --profile <profile> gateway install --force
+openclaw --profile <profile> gateway start
+
+# 3) Recheck health
+bash scripts/healthcheck.sh
+```
+
 ## Install interrupted or failed midway
 
 Symptom:
@@ -74,6 +88,8 @@ tail -n 80 ~/.openclaw-<profile>/logs/dashboard-refresh-loop.log
 
 Main categories and actions:
 - `gateway_fault`: restart gateway or rerun `bash scripts/start.sh`.
+- `gateway_auth_scope`: gateway token scope is insufficient; run `openclaw doctor --fix` and re-install/start gateway.
+- `cron_failures`: cron jobs are in error state; run `openclaw --profile <profile> cron list --all --json` and resync with `bash scripts/install-cron.sh`.
 - `data_lag`: run `cd ~/.openclaw-<profile>/workspace/rd-dashboard && ./refresh.sh`, then检查 `dashboard-refresh-loop`。
 - `github_rate_limit`: wait for rate-limit window, or increase cache/budget:
   - `OPENCLAW_GITHUB_TRACKER_CACHE_TTL_SEC`

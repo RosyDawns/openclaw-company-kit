@@ -167,14 +167,18 @@ PY
 }
 
 echo "=== Gateway Status (${OPENCLAW_PROFILE}) ==="
-gateway_raw="$(ocp status --all --json 2>/dev/null || true)"
-gateway_json="$(printf '%s' "${gateway_raw}" | extract_json_payload 2>/dev/null || true)"
 gateway_reachable="false"
 gateway_error=""
-if [ -n "${gateway_json}" ]; then
-  gateway_reachable="$(printf '%s' "${gateway_json}" | jq -r '.gateway.reachable // false' 2>/dev/null || echo "false")"
-  gateway_error="$(printf '%s' "${gateway_json}" | jq -r '.gateway.error // ""' 2>/dev/null || true)"
-  [ "${gateway_error}" = "null" ] && gateway_error=""
+gateway_status_raw="$(ocp gateway status 2>&1 || true)"
+gateway_status_lc="$(printf '%s' "${gateway_status_raw}" | tr '[:upper:]' '[:lower:]')"
+if printf '%s' "${gateway_status_lc}" | grep -q "rpc probe: ok"; then
+  gateway_reachable="true"
+else
+  gateway_error="$(printf '%s' "${gateway_status_raw}" | awk '
+    BEGIN { err="" }
+    /missing scope|token mismatch|gateway closed|connect failed|RPC probe: failed|not listening/ { err=$0 }
+    END { print err }
+  ')"
 fi
 if [ "${gateway_reachable}" = "true" ]; then
   echo "gateway: responsive"
@@ -187,14 +191,21 @@ else
   prev_count=$(cat "${FAIL_COUNT_FILE}" 2>/dev/null || echo 0)
   echo $((prev_count + 1)) > "${FAIL_COUNT_FILE}"
   SHOULD_RESTART_GATEWAY=1
+  gateway_error_lc="$(printf '%s' "${gateway_error}" | tr '[:upper:]' '[:lower:]')"
+  gateway_category="gateway_fault"
   gateway_reason="OpenClaw gateway 无响应"
   gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
-  if [ -n "${gateway_error}" ] && printf '%s' "${gateway_error}" | tr '[:upper:]' '[:lower:]' | grep -q "token mismatch"; then
+  if [ -n "${gateway_error_lc}" ] && printf '%s' "${gateway_error_lc}" | grep -q "token mismatch"; then
     gateway_reason="OpenClaw gateway 鉴权失败（token mismatch）"
     gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} gateway stop && openclaw --profile ${OPENCLAW_PROFILE} gateway install --force && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+  elif [ -n "${gateway_error_lc}" ] && printf '%s' "${gateway_error_lc}" | grep -Eq "missing scope: *operator\\.read|missing scope"; then
+    SHOULD_RESTART_GATEWAY=0
+    gateway_category="gateway_auth_scope"
+    gateway_reason="OpenClaw gateway 鉴权作用域不足（missing scope）"
+    gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} doctor --fix --non-interactive --yes；若仍失败再执行 openclaw --profile ${OPENCLAW_PROFILE} gateway install --force && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
   fi
   add_classification \
-    "gateway_fault" \
+    "${gateway_category}" \
     "critical" \
     "${gateway_reason}" \
     "${gateway_action}"
@@ -210,6 +221,11 @@ cron_failures="$(echo "${cron_json}" | jq -r '[.jobs[] | select(.state.lastRunSt
 if [ "${cron_failures}" -gt 0 ]; then
   echo "cron failures: ${cron_failures} job(s) in error state"
   echo "${cron_json}" | jq -r '.jobs[] | select(.state.lastRunStatus == "error") | "  FAILED: \(.name) (\(.agentId))"' 2>/dev/null || true
+  add_classification \
+    "cron_failures" \
+    "warning" \
+    "cron 有 ${cron_failures} 个任务处于 error 状态" \
+    "运行 openclaw --profile ${OPENCLAW_PROFILE} cron list --all --json 查看失败任务，并执行 bash scripts/install-cron.sh 重新同步"
   max_exit_code 1
 else
   echo "cron: all healthy"

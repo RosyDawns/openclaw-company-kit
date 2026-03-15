@@ -7,8 +7,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 load_env
 check_cmds
 required_var GROUP_ID
-required_var FEISHU_HOT_APP_ID
-required_var FEISHU_HOT_APP_SECRET
+required_var FEISHU_AI_APP_ID
+required_var FEISHU_AI_APP_SECRET
 
 PROFILE_CONFIG_PATH="$(ocp config file 2>/dev/null || true)"
 PROFILE_CONFIG_PATH="$(expand_tilde_path "${PROFILE_CONFIG_PATH:-}")"
@@ -163,6 +163,118 @@ warn_agent_model_base_urls() {
   done < <(find "${agents_root}" -type f -path '*/agent/models.json' | sort)
 }
 
+resolve_auth_seed_provider() {
+  if [ -n "${CUSTOM_PROVIDER_ID:-}" ]; then
+    printf '%s\n' "${CUSTOM_PROVIDER_ID}"
+    return 0
+  fi
+  if [[ "${MODEL_PRIMARY:-}" == */* ]]; then
+    printf '%s\n' "${MODEL_PRIMARY%%/*}"
+    return 0
+  fi
+  printf '\n'
+}
+
+resolve_auth_seed_api_key() {
+  local provider="$1"
+  local from_cfg
+
+  if [ -n "${CUSTOM_API_KEY:-}" ]; then
+    printf '%s\n' "${CUSTOM_API_KEY}"
+    return 0
+  fi
+  [ -n "${provider}" ] || {
+    printf '\n'
+    return 0
+  }
+
+  from_cfg="$(jq -r --arg p "${provider}" '.models.providers[$p].apiKey // ""' "${PROFILE_DIR}/openclaw.json" 2>/dev/null || true)"
+  printf '%s\n' "${from_cfg}"
+}
+
+seed_agent_model_auth_profiles() {
+  local provider="$1"
+  local api_key="$2"
+  local profile_id auth_file tmp_auth
+  local target_agents=(
+    main
+    ai-tech
+    rd-company
+    role-product
+    role-tech-director
+    role-senior-dev
+    role-growth
+    role-code-reviewer
+    role-qa-test
+  )
+
+  [ -n "${provider}" ] || {
+    echo "[WARN] install.auth: provider id is empty, skip auth profile seed" >&2
+    return 0
+  }
+  [ -n "${api_key}" ] || {
+    echo "[WARN] install.auth: API key is empty for provider=${provider}, skip auth profile seed" >&2
+    return 0
+  }
+
+  profile_id="${provider}:manual"
+  for agent_id in "${target_agents[@]}"; do
+    mkdir -p "${TARGET_AGENTS_DIR}/${agent_id}/agent"
+    auth_file="${TARGET_AGENTS_DIR}/${agent_id}/agent/auth-profiles.json"
+    if [ -f "${auth_file}" ] && ! jq -e . "${auth_file}" >/dev/null 2>&1; then
+      rm -f "${auth_file}"
+    fi
+    tmp_auth="$(mktemp)"
+    if [ -f "${auth_file}" ]; then
+      jq \
+        --arg pid "${profile_id}" \
+        --arg provider "${provider}" \
+        --arg key "${api_key}" \
+        '
+        .version = 1 |
+        .profiles = (.profiles // {}) |
+        .profiles[$pid] = {"type":"api_key","provider":$provider,"key":$key} |
+        .order = (.order // {}) |
+        .order[$provider] = [$pid]
+      ' "${auth_file}" > "${tmp_auth}"
+    else
+      jq -n \
+        --arg pid "${profile_id}" \
+        --arg provider "${provider}" \
+        --arg key "${api_key}" \
+        '
+        {
+          "version": 1,
+          "profiles": {
+            ($pid): {"type":"api_key","provider":$provider,"key":$key}
+          },
+          "order": {
+            ($provider): [$pid]
+          }
+        }
+      ' > "${tmp_auth}"
+    fi
+    mv "${tmp_auth}" "${auth_file}"
+    chmod 600 "${auth_file}" 2>/dev/null || true
+  done
+  echo "[install] model auth seeded for ${#target_agents[@]} agents (provider=${provider}, profile=${profile_id})"
+}
+
+wait_gateway_rpc_ready() {
+  local timeout_sec="${1:-15}"
+  local probe
+  local i
+
+  for ((i=0; i<timeout_sec; i++)); do
+    probe="$(ocp gateway status 2>&1 || true)"
+    if printf '%s' "${probe}" | grep -q 'RPC probe: ok'; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 backup_file_if_exists "${PROFILE_DIR}/openclaw.json"
 backup_file_if_exists "${PROFILE_DIR}/exec-approvals.json"
 backup_file_if_exists "${SHARED_CONTEXT_DIR}/priorities.md"
@@ -198,7 +310,12 @@ fi
 echo "[install] profile=${OPENCLAW_PROFILE}"
 echo "[install] config=${PROFILE_DIR}/openclaw.json"
 
-for agent_id in hot-search ai-tech rd-company role-product role-tech-director role-senior-dev role-growth role-code-reviewer role-qa-test; do
+PRIMARY_FEISHU_ACCOUNT_ID="${FEISHU_AI_ACCOUNT_ID}"
+PRIMARY_FEISHU_BOT_NAME="${FEISHU_AI_BOT_NAME}"
+PRIMARY_FEISHU_APP_ID="${FEISHU_AI_APP_ID}"
+PRIMARY_FEISHU_APP_SECRET="${FEISHU_AI_APP_SECRET}"
+
+for agent_id in ai-tech rd-company role-product role-tech-director role-senior-dev role-growth role-code-reviewer role-qa-test; do
   mkdir -p "${TARGET_AGENTS_DIR}/${agent_id}"
   for mdfile in SOUL.md AGENTS.md MEMORY.md HEARTBEAT.md IDENTITY.md TOOLS.md USER.md BOOTSTRAP.md; do
     if [ -f "${ROOT_DIR}/templates/agents/${agent_id}/${mdfile}" ]; then
@@ -209,7 +326,7 @@ for agent_id in hot-search ai-tech rd-company role-product role-tech-director ro
         -e "s|__PROJECT_PATH__|${PROJECT_PATH}|g" \
         -e "s|__PROJECT_REPO__|${PROJECT_REPO}|g" \
         -e "s|__COMPANY_NAME__|${COMPANY_NAME}|g" \
-        -e "s|__FEISHU_HOT_BOT_NAME__|${FEISHU_HOT_BOT_NAME}|g" \
+        -e "s|__FEISHU_HOT_BOT_NAME__|${PRIMARY_FEISHU_BOT_NAME}|g" \
         -e "s|__FEISHU_AI_BOT_NAME__|${FEISHU_AI_BOT_NAME}|g" \
         -e "s|__SHARED_CONTEXT__|${SHARED_CONTEXT_DIR}|g" \
         "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
@@ -269,14 +386,10 @@ jq \
   --arg companyName "${COMPANY_NAME}" \
   --arg projectPath "${PROJECT_PATH}" \
   --arg projectRepo "${PROJECT_REPO}" \
-  --arg hotAccount "${FEISHU_HOT_ACCOUNT_ID}" \
-  --arg hotAppId "${FEISHU_HOT_APP_ID}" \
-  --arg hotAppSecret "${FEISHU_HOT_APP_SECRET}" \
-  --arg hotBotName "${FEISHU_HOT_BOT_NAME}" \
-  --arg aiAccount "${FEISHU_AI_ACCOUNT_ID}" \
-  --arg aiAppId "${FEISHU_AI_APP_ID}" \
-  --arg aiAppSecret "${FEISHU_AI_APP_SECRET}" \
-  --arg aiBotName "${FEISHU_AI_BOT_NAME}" \
+  --arg primaryAccount "${PRIMARY_FEISHU_ACCOUNT_ID}" \
+  --arg primaryAppId "${PRIMARY_FEISHU_APP_ID}" \
+  --arg primaryAppSecret "${PRIMARY_FEISHU_APP_SECRET}" \
+  --arg primaryBotName "${PRIMARY_FEISHU_BOT_NAME}" \
   --arg ghToken "${GH_TOKEN}" \
   --arg modelPrimary "${MODEL_PRIMARY}" \
   --arg modelSubagent "${MODEL_SUBAGENT}" \
@@ -292,8 +405,6 @@ jq \
   (if $modelSubagent != "" then .agents.defaults.subagents.model = $modelSubagent else . end) |
   .agents.list = [
     {"id":"main","default":true,"name":"主助手","workspace":($stateDir + "/workspace")},
-    {"id":"hot-search","name":"热点推荐","workspace":($stateDir + "/agents/hot-search"),
-     "tools":{"deny":["exec","group:runtime","group:fs","group:sessions"]}},
     {"id":"ai-tech","name":"AI科技","workspace":($stateDir + "/agents/ai-tech"),
      "tools":{"deny":["exec","group:runtime","group:fs","group:sessions"]}},
     {"id":"rd-company","name":"公司研发中台","workspace":($stateDir + "/agents/rd-company"),
@@ -302,8 +413,8 @@ jq \
      "subagents":{"allowAgents":["role-tech-director","role-senior-dev","role-code-reviewer","role-qa-test","role-product","role-growth"]}},
     {"id":"role-product","name":"产品经理","workspace":($stateDir + "/agents/role-product"),
      "identity":{"name":"产品经理"},
-     "tools":{"allow":["read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
-              "deny":["exec","group:runtime","write","edit","apply_patch"]}},
+     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["write","edit","apply_patch"]}},
     {"id":"role-tech-director","name":"技术总监","workspace":($stateDir + "/agents/role-tech-director"),
      "identity":{"name":"技术总监"},
      "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
@@ -325,58 +436,34 @@ jq \
      "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
               "deny":["write","edit","apply_patch"]}}
   ] |
-  .bindings = (
-    [
-      {
-        "agentId":"rd-company",
-        "comment":"公司研发群固定路由",
-        "match":{"channel":"feishu","accountId":$hotAccount,"peer":{"kind":"group","id":$groupId}}
-      },
-      {"agentId":"hot-search","match":{"channel":"feishu","accountId":$hotAccount}}
-    ]
-    + (if $aiAppId != "" then [{"agentId":"ai-tech","match":{"channel":"feishu","accountId":$aiAccount}}] else [] end)
-  ) |
+  .bindings = [
+    {
+      "agentId":"rd-company",
+      "comment":"公司研发群固定路由",
+      "match":{"channel":"feishu","accountId":$primaryAccount,"peer":{"kind":"group","id":$groupId}}
+    },
+    {"agentId":"ai-tech","match":{"channel":"feishu","accountId":$primaryAccount}}
+  ] |
   .channels = (.channels // {}) |
   .channels.feishu = ((.channels.feishu // {}) + {"enabled":true,"domain":"feishu"}) |
-  .channels.feishu.accounts = (
-    (
-      (.channels.feishu.accounts // {})
-      + {
-        ($hotAccount): {
-          "enabled": true,
-          "appId": $hotAppId,
-          "appSecret": $hotAppSecret,
-          "botName": $hotBotName,
-          "dmPolicy": "allowlist",
-          "groupPolicy": "allowlist",
-          "allowFrom": $allowFrom,
-          "groupAllowFrom": $allowFrom
-        },
-        "default": {
-          "groupPolicy": "allowlist",
-          "dmPolicy": "allowlist",
-          "allowFrom": $allowFrom,
-          "groupAllowFrom": $allowFrom
-        }
-      }
-    )
-    | if $aiAppId != "" and $aiAppSecret != "" then
-        . + {
-          ($aiAccount): {
-            "enabled": true,
-            "appId": $aiAppId,
-            "appSecret": $aiAppSecret,
-            "botName": $aiBotName,
-            "dmPolicy": "allowlist",
-            "groupPolicy": "allowlist",
-            "allowFrom": $allowFrom,
-            "groupAllowFrom": $allowFrom
-          }
-        }
-      else
-        del(.[$aiAccount])
-      end
-  ) |
+  .channels.feishu.accounts = {
+    ($primaryAccount): {
+      "enabled": true,
+      "appId": $primaryAppId,
+      "appSecret": $primaryAppSecret,
+      "botName": $primaryBotName,
+      "dmPolicy": "allowlist",
+      "groupPolicy": "allowlist",
+      "allowFrom": $allowFrom,
+      "groupAllowFrom": $allowFrom
+    },
+    "default": {
+      "groupPolicy": "allowlist",
+      "dmPolicy": "allowlist",
+      "allowFrom": $allowFrom,
+      "groupAllowFrom": $allowFrom
+    }
+  } |
   .channels.feishu.groups = ((.channels.feishu.groups // {}) + {
     ($groupId): {
       "requireMention": false,
@@ -387,7 +474,8 @@ jq \
   .commands.nativeSkills = "auto" |
   .commands.restart = true |
   .commands.ownerDisplay = "raw" |
-  .tools.profile = "messaging" |
+  .tools = (.tools // {}) |
+  .tools |= del(.profile) |
   .tools.agentToAgent = {"enabled": true, "allow": ["rd-company","role-tech-director","role-senior-dev","role-code-reviewer","role-qa-test","role-product","role-growth"]} |
   .messages.ackReactionScope = "group-mentions" |
   .session.dmScope = "per-channel-peer" |
@@ -410,6 +498,7 @@ jq \
   ' "${PROFILE_DIR}/openclaw.json" > "${tmp_cfg}"
 
 mv "${tmp_cfg}" "${PROFILE_DIR}/openclaw.json"
+ensure_gateway_local_mode "${PROFILE_DIR}/openclaw.json" "install"
 
 warn_profile_model_base_urls "${PROFILE_DIR}/openclaw.json"
 warn_agent_model_base_urls "${TARGET_AGENTS_DIR}"
@@ -441,16 +530,43 @@ OPENCLAW_PROJECT_DIR=${PROJECT_PATH}
 OPENCLAW_PROJECT_REPO=${PROJECT_REPO}
 OPENCLAW_CONFIG=${PROFILE_DIR}/openclaw.json
 WORKFLOW_TEMPLATE=${WORKFLOW_TEMPLATE_ID}
-CRON_GUARD_FEISHU_ACCOUNT=${FEISHU_HOT_ACCOUNT_ID}
+CRON_GUARD_FEISHU_ACCOUNT=${PRIMARY_FEISHU_ACCOUNT_ID}
 CRON_GUARD_FEISHU_TARGET=${GROUP_ID}
 RUNTIME_ENV
 
 chmod +x "${TARGET_DASHBOARD_DIR}/"*.sh
 
+AUTH_SEED_PROVIDER="$(resolve_auth_seed_provider)"
+AUTH_SEED_API_KEY="$(resolve_auth_seed_api_key "${AUTH_SEED_PROVIDER}")"
+seed_agent_model_auth_profiles "${AUTH_SEED_PROVIDER}" "${AUTH_SEED_API_KEY}"
+
 ocp config get agents --json >/dev/null
 
-if ! "${ROOT_DIR}/scripts/install-cron.sh"; then
+cron_synced=0
+if wait_gateway_rpc_ready 15; then
+  if "${ROOT_DIR}/scripts/install-cron.sh"; then
+    cron_synced=1
+  fi
+else
+  echo "[WARN] gateway RPC not ready before cron sync (initial attempt)" >&2
+fi
+
+if [ "${cron_synced}" -ne 1 ]; then
   echo "[WARN] cron sync failed (gateway unreachable or auth mismatch)." >&2
+  echo "[WARN] retrying once after gateway reinstall/restart..." >&2
+  ocp gateway install --force >/dev/null 2>&1 || true
+  ocp gateway start >/dev/null 2>&1 || true
+  if wait_gateway_rpc_ready 20; then
+    if "${ROOT_DIR}/scripts/install-cron.sh"; then
+      cron_synced=1
+      echo "[install] cron sync recovered after gateway restart"
+    fi
+  else
+    echo "[WARN] gateway RPC still not ready after restart warm-up" >&2
+  fi
+fi
+
+if [ "${cron_synced}" -ne 1 ]; then
   echo "[WARN] you can run it later: bash scripts/install-cron.sh" >&2
 fi
 

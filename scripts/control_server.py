@@ -38,8 +38,8 @@ DEFAULT_CONFIG = {
     "PROJECT_REPO": "your-org/your-repo",
     "WORKFLOW_TEMPLATE": "default",
     "GROUP_ID": "",
-    "FEISHU_HOT_ACCOUNT_ID": "hot-search",
-    "FEISHU_HOT_BOT_NAME": "小龙虾 1 号",
+    "FEISHU_HOT_ACCOUNT_ID": "",
+    "FEISHU_HOT_BOT_NAME": "",
     "FEISHU_HOT_APP_ID": "",
     "FEISHU_HOT_APP_SECRET": "",
     "FEISHU_AI_ACCOUNT_ID": "ai-tech",
@@ -343,7 +343,7 @@ def preflight_check(config: dict[str, str]) -> dict:
         "blocking": False,
     })
 
-    required_vars = ["GROUP_ID", "FEISHU_HOT_APP_ID", "FEISHU_HOT_APP_SECRET"]
+    required_vars = ["GROUP_ID", "FEISHU_AI_APP_ID", "FEISHU_AI_APP_SECRET"]
     for var in required_vars:
         checks.append({"name": var, "ok": bool(config.get(var, "").strip()), "type": "env"})
 
@@ -413,9 +413,18 @@ def set_task_status(task_id: str, status: str, *, failed_step: str | None = None
         append_task_audit(audit_row)
 
 
-def run_task(task_id: str, steps: list[tuple[str, list[str]]]) -> None:
+def run_task(task_id: str, steps: list[tuple]) -> None:
     try:
-        for step_name, cmd in steps:
+        for step in steps:
+            if len(step) == 2:
+                step_name, cmd = step
+                allowed_codes = {0}
+            else:
+                step_name, cmd, allowed = step
+                allowed_codes = {int(code) for code in (allowed or [0])}
+                if not allowed_codes:
+                    allowed_codes = {0}
+
             step_started_epoch = time.time()
             append_task_log(task_id, f"[{now_text()}] STEP {step_name}")
             append_task_log(task_id, "$ " + " ".join(cmd))
@@ -440,6 +449,11 @@ def run_task(task_id: str, steps: list[tuple[str, list[str]]]) -> None:
                 append_task_log(task_id, line.rstrip())
             code = proc.wait()
             append_task_log(task_id, f"[{now_text()}] EXIT {step_name}: {code}")
+            if code != 0 and code in allowed_codes:
+                append_task_log(
+                    task_id,
+                    f"[WARN] {step_name} exited with {code} (tolerated for this workflow)",
+                )
             append_task_audit(
                 {
                     "event": "task_step_exit",
@@ -450,7 +464,7 @@ def run_task(task_id: str, steps: list[tuple[str, list[str]]]) -> None:
                     "durationSec": max(0.0, round(time.time() - step_started_epoch, 3)),
                 }
             )
-            if code != 0:
+            if code not in allowed_codes:
                 set_task_status(task_id, "failed", failed_step=step_name, failed_code=code)
                 return
         set_task_status(task_id, "success")
@@ -467,7 +481,7 @@ def run_task(task_id: str, steps: list[tuple[str, list[str]]]) -> None:
         set_task_status(task_id, "failed", failed_step="runtime", failed_code=-1)
 
 
-def create_task(name: str, steps: list[tuple[str, list[str]]]) -> dict:
+def create_task(name: str, steps: list[tuple]) -> dict:
     task_id = uuid.uuid4().hex[:10]
     started_epoch = time.time()
     task = {
@@ -750,7 +764,8 @@ class ControlHandler(BaseHTTPRequestHandler):
                     ("onboard", ["bash", "scripts/onboard-wrapper.sh"]),
                     ("install", ["bash", "scripts/install.sh"]),
                     ("start", ["bash", "scripts/start.sh"]),
-                    ("healthcheck", ["bash", "scripts/healthcheck.sh"]),
+                    # healthcheck exit code: 0=healthy, 1=warning, 2=critical
+                    ("healthcheck", ["bash", "scripts/healthcheck.sh"], [0, 1]),
                 ],
             )
             self._send_json({"ok": True, "taskId": task["id"]})
@@ -762,7 +777,8 @@ class ControlHandler(BaseHTTPRequestHandler):
                 [
                     ("stop", ["bash", "scripts/stop.sh"]),
                     ("start", ["bash", "scripts/start.sh"]),
-                    ("healthcheck", ["bash", "scripts/healthcheck.sh"]),
+                    # healthcheck exit code: 0=healthy, 1=warning, 2=critical
+                    ("healthcheck", ["bash", "scripts/healthcheck.sh"], [0, 1]),
                 ],
             )
             self._send_json({"ok": True, "taskId": task["id"]})

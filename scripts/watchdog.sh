@@ -94,6 +94,7 @@ restart_gateway() {
   [ "${backoff}" -gt "${BACKOFF_MAX}" ] && backoff="${BACKOFF_MAX}"
 
   log "attempting restart #$((count + 1)) (backoff=${backoff}s)"
+  ensure_gateway_local_mode "${PROFILE_DIR}/openclaw.json" "watchdog"
 
   if detect_gateway_token_mismatch; then
     log "gateway token mismatch detected, applying stop/install --force/start repair"
@@ -123,6 +124,7 @@ while true; do
     categories=""
     should_restart_gateway="false"
     gateway_action=""
+    gateway_scope_action=""
     data_lag_action=""
     rate_limit_action=""
 
@@ -130,6 +132,7 @@ while true; do
       categories="$(jq -r '[.classifications[].category] | unique | join(",")' "${HEALTH_SUMMARY_FILE}" 2>/dev/null || echo "")"
       should_restart_gateway="$(jq -r '.shouldRestartGateway // false' "${HEALTH_SUMMARY_FILE}" 2>/dev/null || echo "false")"
       gateway_action="$(jq -r '.classifications[] | select(.category == "gateway_fault") | .action' "${HEALTH_SUMMARY_FILE}" 2>/dev/null | head -n1 || true)"
+      gateway_scope_action="$(jq -r '.classifications[] | select(.category == "gateway_auth_scope") | .action' "${HEALTH_SUMMARY_FILE}" 2>/dev/null | head -n1 || true)"
       data_lag_action="$(jq -r '.classifications[] | select(.category == "data_lag") | .action' "${HEALTH_SUMMARY_FILE}" 2>/dev/null | head -n1 || true)"
       rate_limit_action="$(jq -r '.classifications[] | select(.category == "github_rate_limit") | .action' "${HEALTH_SUMMARY_FILE}" 2>/dev/null | head -n1 || true)"
     fi
@@ -142,6 +145,14 @@ while true; do
         notify_feishu "⚠️ Gateway 故障（连续 ${fail_count} 次），正在自动重启... 建议：${gateway_action:-检查 openclaw gateway 进程状态}"
       fi
       restart_gateway || true
+      continue
+    fi
+
+    if printf '%s' "${categories}" | grep -q "gateway_auth_scope"; then
+      log "gateway auth scope issue detected, skip auto-restart"
+      if should_notify_alert "gateway_auth_scope"; then
+        notify_feishu "⚠️ Gateway 鉴权作用域不足，建议：${gateway_scope_action:-运行 openclaw doctor --fix 后重试}"
+      fi
       continue
     fi
 

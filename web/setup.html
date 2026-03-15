@@ -459,8 +459,8 @@
       function validateCore(cfg) {
         const miss = [];
         if (!cfg.GROUP_ID) miss.push("GROUP_ID");
-        if (!cfg.FEISHU_HOT_APP_ID) miss.push("FEISHU_HOT_APP_ID");
-        if (!cfg.FEISHU_HOT_APP_SECRET) miss.push("FEISHU_HOT_APP_SECRET");
+        if (!cfg.FEISHU_AI_APP_ID) miss.push("FEISHU_AI_APP_ID");
+        if (!cfg.FEISHU_AI_APP_SECRET) miss.push("FEISHU_AI_APP_SECRET");
         if (!/^\d+$/.test(cfg.DASHBOARD_PORT || "")) miss.push("DASHBOARD_PORT");
         return miss;
       }
@@ -587,38 +587,38 @@
           "step-feishu": `
             <article class="card">
               <h2>飞书账号映射</h2>
-              <p class="hint">默认两套飞书应用：hot-search 负责群路由，ai-tech 负责情报类账号（可选）。</p>
+              <p class="hint">默认单机器人：ai-tech 负责群路由与情报能力。hot-search 字段仅兼容旧配置，可留空。</p>
               <div class="grid">
                 <div class="field">
-                  <label>FEISHU_HOT_ACCOUNT_ID</label>
-                  <input id="FEISHU_HOT_ACCOUNT_ID" value="${esc(c.FEISHU_HOT_ACCOUNT_ID || "hot-search")}" />
+                  <label>FEISHU_HOT_ACCOUNT_ID (兼容旧配置，可选)</label>
+                  <input id="FEISHU_HOT_ACCOUNT_ID" value="${esc(c.FEISHU_HOT_ACCOUNT_ID || "")}" />
                 </div>
                 <div class="field">
-                  <label>FEISHU_HOT_BOT_NAME</label>
-                  <input id="FEISHU_HOT_BOT_NAME" value="${esc(c.FEISHU_HOT_BOT_NAME || "小龙虾 1 号")}" />
+                  <label>FEISHU_HOT_BOT_NAME (兼容旧配置，可选)</label>
+                  <input id="FEISHU_HOT_BOT_NAME" value="${esc(c.FEISHU_HOT_BOT_NAME || "")}" />
                 </div>
                 <div class="field">
-                  <label>FEISHU_HOT_APP_ID (必填)</label>
+                  <label>FEISHU_HOT_APP_ID (兼容旧配置，可选)</label>
                   <input id="FEISHU_HOT_APP_ID" value="${esc(c.FEISHU_HOT_APP_ID || "")}" />
                 </div>
                 <div class="field">
-                  <label>FEISHU_HOT_APP_SECRET (必填)</label>
+                  <label>FEISHU_HOT_APP_SECRET (兼容旧配置，可选)</label>
                   <input id="FEISHU_HOT_APP_SECRET" type="password" value="${esc(c.FEISHU_HOT_APP_SECRET || "")}" />
                 </div>
                 <div class="field">
-                  <label>FEISHU_AI_ACCOUNT_ID (可选)</label>
+                  <label>FEISHU_AI_ACCOUNT_ID (必填)</label>
                   <input id="FEISHU_AI_ACCOUNT_ID" value="${esc(c.FEISHU_AI_ACCOUNT_ID || "ai-tech")}" />
                 </div>
                 <div class="field">
-                  <label>FEISHU_AI_BOT_NAME (可选)</label>
+                  <label>FEISHU_AI_BOT_NAME (必填)</label>
                   <input id="FEISHU_AI_BOT_NAME" value="${esc(c.FEISHU_AI_BOT_NAME || "小龙虾 2 号")}" />
                 </div>
                 <div class="field">
-                  <label>FEISHU_AI_APP_ID (可选)</label>
+                  <label>FEISHU_AI_APP_ID (必填)</label>
                   <input id="FEISHU_AI_APP_ID" value="${esc(c.FEISHU_AI_APP_ID || "")}" />
                 </div>
                 <div class="field">
-                  <label>FEISHU_AI_APP_SECRET (可选)</label>
+                  <label>FEISHU_AI_APP_SECRET (必填)</label>
                   <input id="FEISHU_AI_APP_SECRET" type="password" value="${esc(c.FEISHU_AI_APP_SECRET || "")}" />
                 </div>
               </div>

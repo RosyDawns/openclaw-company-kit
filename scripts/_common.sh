@@ -18,18 +18,43 @@ load_env() {
   PROJECT_REPO="${PROJECT_REPO:-your-org/your-repo}"
   WORKFLOW_TEMPLATE="${WORKFLOW_TEMPLATE:-default}"
 
+  # Accept either "owner/repo" or a GitHub URL and normalize to "owner/repo"
+  # because downstream gh api calls require that slug form.
+  if [[ "${PROJECT_REPO}" =~ ^https?://github\.com/([^/]+)/([^/?#]+)(\.git)?/?$ ]]; then
+    PROJECT_REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  elif [[ "${PROJECT_REPO}" =~ ^git@github\.com:([^/]+)/([^/?#]+)(\.git)?$ ]]; then
+    PROJECT_REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  elif [[ "${PROJECT_REPO}" =~ ^github\.com/([^/]+)/([^/?#]+)(\.git)?/?$ ]]; then
+    PROJECT_REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+  fi
+  PROJECT_REPO="${PROJECT_REPO%.git}"
+
   GROUP_ID="${GROUP_ID:-}"
 
-  FEISHU_HOT_ACCOUNT_ID="${FEISHU_HOT_ACCOUNT_ID:-hot-search}"
-  FEISHU_HOT_BOT_NAME="${FEISHU_HOT_BOT_NAME:-小龙虾 1 号}"
+  FEISHU_HOT_ACCOUNT_ID="${FEISHU_HOT_ACCOUNT_ID:-}"
+  FEISHU_HOT_BOT_NAME="${FEISHU_HOT_BOT_NAME:-}"
   FEISHU_HOT_APP_ID="${FEISHU_HOT_APP_ID:-}"
   FEISHU_HOT_APP_SECRET="${FEISHU_HOT_APP_SECRET:-}"
   FEISHU_ALLOW_FROM="${FEISHU_ALLOW_FROM:-}"
 
-  FEISHU_AI_ACCOUNT_ID="${FEISHU_AI_ACCOUNT_ID:-ai-tech}"
-  FEISHU_AI_BOT_NAME="${FEISHU_AI_BOT_NAME:-小龙虾 2 号}"
+  FEISHU_AI_ACCOUNT_ID="${FEISHU_AI_ACCOUNT_ID:-}"
+  FEISHU_AI_BOT_NAME="${FEISHU_AI_BOT_NAME:-}"
   FEISHU_AI_APP_ID="${FEISHU_AI_APP_ID:-}"
   FEISHU_AI_APP_SECRET="${FEISHU_AI_APP_SECRET:-}"
+
+  # Single-bot default: ai-tech is the only required external bot account.
+  # Backward-compatible fallback: if older setups only filled FEISHU_HOT_*,
+  # copy those values into FEISHU_AI_*.
+  [ -n "${FEISHU_AI_ACCOUNT_ID}" ] || FEISHU_AI_ACCOUNT_ID="${FEISHU_HOT_ACCOUNT_ID:-ai-tech}"
+  [ -n "${FEISHU_AI_BOT_NAME}" ] || FEISHU_AI_BOT_NAME="${FEISHU_HOT_BOT_NAME:-小龙虾 2 号}"
+  [ -n "${FEISHU_AI_APP_ID}" ] || FEISHU_AI_APP_ID="${FEISHU_HOT_APP_ID:-}"
+  [ -n "${FEISHU_AI_APP_SECRET}" ] || FEISHU_AI_APP_SECRET="${FEISHU_HOT_APP_SECRET:-}"
+
+  # Keep legacy FEISHU_HOT_* populated for templates/scripts that still read them.
+  [ -n "${FEISHU_HOT_ACCOUNT_ID}" ] || FEISHU_HOT_ACCOUNT_ID="${FEISHU_AI_ACCOUNT_ID}"
+  [ -n "${FEISHU_HOT_BOT_NAME}" ] || FEISHU_HOT_BOT_NAME="${FEISHU_AI_BOT_NAME}"
+  [ -n "${FEISHU_HOT_APP_ID}" ] || FEISHU_HOT_APP_ID="${FEISHU_AI_APP_ID}"
+  [ -n "${FEISHU_HOT_APP_SECRET}" ] || FEISHU_HOT_APP_SECRET="${FEISHU_AI_APP_SECRET}"
 
   GH_TOKEN="${GH_TOKEN:-}"
   MODEL_PRIMARY="${MODEL_PRIMARY:-}"
@@ -114,7 +139,8 @@ check_cmds() {
 }
 
 ocp() {
-  openclaw "${OPENCLAW_ARGS[@]}" "$@"
+  # Avoid inheriting low-scope gateway tokens from parent processes.
+  env -u OPENCLAW_GATEWAY_TOKEN openclaw "${OPENCLAW_ARGS[@]}" "$@"
 }
 
 sed_inplace() {
@@ -138,6 +164,54 @@ expand_tilde_path() {
       printf '%s\n' "${p}"
       ;;
   esac
+}
+
+extract_json_payload() {
+  python3 -c '
+import json
+import sys
+
+raw = sys.stdin.read()
+decoder = json.JSONDecoder()
+for idx, ch in enumerate(raw):
+    if ch not in "{[":
+        continue
+    try:
+        obj, _ = decoder.raw_decode(raw[idx:])
+    except Exception:
+        continue
+    print(json.dumps(obj, ensure_ascii=False))
+    raise SystemExit(0)
+raise SystemExit(1)
+'
+}
+
+ensure_gateway_local_mode() {
+  local cfg_path="${1:-${PROFILE_DIR}/openclaw.json}"
+  local context="${2:-config}"
+  local tmp_cfg
+
+  [ -f "${cfg_path}" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  tmp_cfg="$(mktemp)"
+  if jq '
+      (.gateway //= {}) |
+      (if ((.gateway.mode? | type) != "string") or ((.gateway.mode? // "") == "") then
+         .gateway.mode = "local"
+       else
+         .
+       end)
+    ' "${cfg_path}" > "${tmp_cfg}"; then
+    if ! cmp -s "${cfg_path}" "${tmp_cfg}"; then
+      mv "${tmp_cfg}" "${cfg_path}"
+      echo "[${context}] ensured gateway.mode=local"
+    else
+      rm -f "${tmp_cfg}" >/dev/null 2>&1 || true
+    fi
+  else
+    rm -f "${tmp_cfg}" >/dev/null 2>&1 || true
+  fi
 }
 
 warn_model_base_url() {

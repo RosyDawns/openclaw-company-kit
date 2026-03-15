@@ -277,7 +277,7 @@ profile_state_dir() {
 
 main() {
   echo "=== OpenClaw Company Kit Bootstrap ==="
-  echo "Note: 7 role agents map to 2 Feishu apps by default (hot-search + ai-tech), not 7 separate apps."
+  echo "Note: default setup uses single Feishu app (ai-tech). FEISHU_HOT_* is optional legacy compatibility."
 
   ensure_cmd openclaw openclaw
   ensure_cmd jq jq
@@ -294,8 +294,8 @@ main() {
   local default_ai_account_id default_ai_bot_name default_ai_app_id default_ai_app_secret
 
   default_group_id="oc_replace_with_group_id"
-  default_hot_account_id="hot-search"
-  default_hot_bot_name="小龙虾 1 号"
+  default_hot_account_id="ai-tech"
+  default_hot_bot_name="小龙虾 2 号"
   default_hot_app_id=""
   default_hot_app_secret=""
   default_ai_account_id="ai-tech"
@@ -317,7 +317,7 @@ main() {
     default_ai_account_id="$(jq -r '.bindings[]? | select(.agentId=="ai-tech" and .match.channel=="feishu") | .match.accountId // empty' "${local_cfg}" | head -n1 || true)"
 
     [ -n "${default_group_id}" ] || default_group_id="oc_replace_with_group_id"
-    [ -n "${default_hot_account_id}" ] || default_hot_account_id="hot-search"
+    [ -n "${default_hot_account_id}" ] || default_hot_account_id="${default_ai_account_id:-ai-tech}"
     [ -n "${default_ai_account_id}" ] || default_ai_account_id="ai-tech"
 
     default_hot_bot_name="$(jq -r --arg a "${default_hot_account_id}" '.channels.feishu.accounts[$a].botName // empty' "${local_cfg}" || true)"
@@ -328,7 +328,7 @@ main() {
     default_ai_app_id="$(jq -r --arg a "${default_ai_account_id}" '.channels.feishu.accounts[$a].appId // empty' "${local_cfg}" || true)"
     default_ai_app_secret="$(jq -r --arg a "${default_ai_account_id}" '.channels.feishu.accounts[$a].appSecret // empty' "${local_cfg}" || true)"
 
-    [ -n "${default_hot_bot_name}" ] || default_hot_bot_name="小龙虾 1 号"
+    [ -n "${default_hot_bot_name}" ] || default_hot_bot_name="${default_ai_bot_name:-小龙虾 2 号}"
     [ -n "${default_ai_bot_name}" ] || default_ai_bot_name="小龙虾 2 号"
   fi
 
@@ -346,41 +346,30 @@ main() {
     group_id="$(prompt_required "Feishu group ID (oc_...)")"
   done
 
-  hot_account_id="$(prompt_default "Feishu hot account id" "${default_hot_account_id}")"
-  hot_bot_name="$(prompt_default "Feishu hot bot name" "${default_hot_bot_name}")"
-  hot_app_id="$(prompt_default "Feishu hot app id (cli_...)" "${default_hot_app_id}")"
-  while [ -z "${hot_app_id}" ]; do
-    echo "Feishu hot app id cannot be empty."
-    hot_app_id="$(prompt_required "Feishu hot app id (cli_...)")"
+  hot_account_id="$(prompt_default "Legacy Feishu hot account id (optional)" "${default_hot_account_id}")"
+  hot_bot_name="$(prompt_default "Legacy Feishu hot bot name (optional)" "${default_hot_bot_name}")"
+  hot_app_id="$(prompt_default "Legacy Feishu hot app id (optional)" "${default_hot_app_id}")"
+  hot_app_secret="$(prompt_secret_with_default "Legacy Feishu hot app secret (optional)" "${default_hot_app_secret}")"
+
+  with_ai_account=1
+  ai_account_id="$(prompt_default "Feishu ai account id" "${default_ai_account_id}")"
+  ai_bot_name="$(prompt_default "Feishu ai bot name" "${default_ai_bot_name}")"
+  ai_app_id="$(prompt_default "Feishu ai app id (cli_...)" "${default_ai_app_id}")"
+  while [ -z "${ai_app_id}" ]; do
+    echo "Feishu ai app id cannot be empty."
+    ai_app_id="$(prompt_required "Feishu ai app id (cli_...)")"
+  done
+  ai_app_secret="$(prompt_secret_with_default "Feishu ai app secret" "${default_ai_app_secret}")"
+  while [ -z "${ai_app_secret}" ]; do
+    echo "Feishu ai app secret cannot be empty."
+    ai_app_secret="$(prompt_secret_required "Feishu ai app secret")"
   done
 
-  hot_app_secret="$(prompt_secret_with_default "Feishu hot app secret" "${default_hot_app_secret}")"
-  while [ -z "${hot_app_secret}" ]; do
-    echo "Feishu hot app secret cannot be empty."
-    hot_app_secret="$(prompt_secret_required "Feishu hot app secret")"
-  done
-
-  if confirm_yes "Configure second Feishu account (ai-tech, recommended for 7-role setup)?"; then
-    with_ai_account=1
-    ai_account_id="$(prompt_default "Feishu ai account id" "${default_ai_account_id}")"
-    ai_bot_name="$(prompt_default "Feishu ai bot name" "${default_ai_bot_name}")"
-    ai_app_id="$(prompt_default "Feishu ai app id (cli_...)" "${default_ai_app_id}")"
-    while [ -z "${ai_app_id}" ]; do
-      echo "Feishu ai app id cannot be empty."
-      ai_app_id="$(prompt_required "Feishu ai app id (cli_...)")"
-    done
-    ai_app_secret="$(prompt_secret_with_default "Feishu ai app secret" "${default_ai_app_secret}")"
-    while [ -z "${ai_app_secret}" ]; do
-      echo "Feishu ai app secret cannot be empty."
-      ai_app_secret="$(prompt_secret_required "Feishu ai app secret")"
-    done
-  else
-    with_ai_account=0
-    ai_account_id="ai-tech"
-    ai_bot_name="小龙虾 2 号"
-    ai_app_id=""
-    ai_app_secret=""
-  fi
+  # Keep legacy FEISHU_HOT_* in sync when user chooses single-app setup.
+  [ -n "${hot_account_id}" ] || hot_account_id="${ai_account_id}"
+  [ -n "${hot_bot_name}" ] || hot_bot_name="${ai_bot_name}"
+  [ -n "${hot_app_id}" ] || hot_app_id="${ai_app_id}"
+  [ -n "${hot_app_secret}" ] || hot_app_secret="${ai_app_secret}"
 
   if confirm_yes "Set GH_TOKEN for GitHub issue sync now?"; then
     gh_token="$(prompt_secret_required "GH_TOKEN")"

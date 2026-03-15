@@ -83,6 +83,7 @@ repair_gateway_token_mismatch() {
 
 # Ensure OpenClaw gateway LaunchAgent is installed, then start (for one-click deploy)
 # install is idempotent; start may fail if launchd not loaded (e.g. first boot)
+ensure_gateway_local_mode "${PROFILE_DIR}/openclaw.json" "start"
 ocp gateway install >/dev/null 2>&1 || true
 if ! ocp gateway start 2>/dev/null; then
   echo "[WARN] gateway may not be running. If healthcheck fails, run: openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"

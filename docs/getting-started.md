@@ -36,8 +36,8 @@ cp .env.example .env
 
 Required values:
 - `GROUP_ID`
-- `FEISHU_HOT_APP_ID`
-- `FEISHU_HOT_APP_SECRET`
+- `FEISHU_AI_APP_ID`
+- `FEISHU_AI_APP_SECRET`
 - `PROJECT_PATH`
 - `PROJECT_REPO`
 - `WORKFLOW_TEMPLATE` (`default` / `requirement-review` / `bugfix` / `release-retro`)

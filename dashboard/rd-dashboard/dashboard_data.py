@@ -29,6 +29,12 @@ STATE_DIR = Path(os.environ.get("OPENCLAW_STATE_DIR", str(Path.home() / ".opencl
 GROUP_ID = os.environ.get("OPENCLAW_GROUP_ID", "oc_replace_with_group_id")
 PROJECT_DIR = Path(os.environ.get("OPENCLAW_PROJECT_DIR", str(Path.home() / "ai-agent-guide")))
 ASSOCIATION_PATH = Path(__file__).with_name("company-project.json")
+PRIMARY_FEISHU_ACCOUNT = (
+    os.environ.get("CRON_GUARD_FEISHU_ACCOUNT")
+    or os.environ.get("FEISHU_AI_ACCOUNT_ID")
+    or "ai-tech"
+).strip() or "ai-tech"
+RADAR_ALLOWED_ACCOUNTS = {PRIMARY_FEISHU_ACCOUNT, "hot-search"}
 
 CONFIG_PATH = STATE_DIR / "openclaw.json"
 CRON_PATH = STATE_DIR / "cron" / "jobs.json"
@@ -2359,7 +2365,8 @@ def read_latest_radar_brief():
             continue
         if payload.get("to") != GROUP_ID:
             continue
-        if payload.get("accountId") and payload.get("accountId") != "hot-search":
+        account_id = str(payload.get("accountId") or "").strip()
+        if account_id and account_id not in RADAR_ALLOWED_ACCOUNTS:
             continue
 
         text = None

@@ -52,6 +52,25 @@ read_gateway_auth_token() {
   jq -r '.gateway.auth.token // ""' "${cfg_path}" 2>/dev/null || printf '\n'
 }
 
+gateway_token_has_operator_read_scope() {
+  local token="$1"
+  local paired_path="${PROFILE_DIR}/devices/paired.json"
+
+  [ -n "${token}" ] || return 1
+  [ -f "${paired_path}" ] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+
+  jq -e --arg token "${token}" '
+    [
+      .[]?
+      | select((.tokens.operator.token // "") == $token)
+      | ((.tokens.operator.scopes // .scopes // []))
+      | index("operator.read")
+    ]
+    | any(. != null)
+  ' "${paired_path}" >/dev/null 2>&1
+}
+
 restore_gateway_auth_token_if_changed() {
   local cfg_path="$1"
   local expected_token="$2"
@@ -63,6 +82,11 @@ restore_gateway_auth_token_if_changed() {
 
   current_token="$(read_gateway_auth_token "${cfg_path}")"
   if [ -z "${current_token}" ] || [ "${current_token}" = "${expected_token}" ]; then
+    return 0
+  fi
+
+  if ! gateway_token_has_operator_read_scope "${expected_token}"; then
+    echo "[onboard] skipped restoring legacy gateway auth token (missing operator.read scope in paired devices)"
     return 0
   fi
 
@@ -108,6 +132,7 @@ if [ -f "${TARGET_CONFIG}" ]; then
       echo "[onboard] WARN: credential update failed, continuing with existing config" >&2
     fi
     restore_gateway_auth_token_if_changed "${TARGET_CONFIG}" "${old_gateway_token}"
+    ensure_gateway_local_mode "${TARGET_CONFIG}" "onboard"
     if [ "${onboard_ok}" -eq 0 ]; then
       echo "[onboard] OK"
       exit 0
@@ -115,6 +140,7 @@ if [ -f "${TARGET_CONFIG}" ]; then
     echo "[onboard] OK"
     exit 0
   fi
+  ensure_gateway_local_mode "${TARGET_CONFIG}" "onboard"
   echo "[onboard] config exists: ${TARGET_CONFIG}, skipping"
   exit 0
 fi
@@ -124,6 +150,7 @@ if [ -n "${SOURCE_OPENCLAW_CONFIG:-}" ]; then
   if [ -f "${SRC_PATH}" ]; then
     mkdir -p "${PROFILE_DIR}"
     cp "${SRC_PATH}" "${TARGET_CONFIG}"
+    ensure_gateway_local_mode "${TARGET_CONFIG}" "onboard"
     echo "[onboard] copied config from ${SRC_PATH}"
     echo "[onboard] OK"
     exit 0
@@ -140,4 +167,5 @@ if ! ocp onboard \
   exit 1
 fi
 
+ensure_gateway_local_mode "${TARGET_CONFIG}" "onboard"
 echo "[onboard] OK"

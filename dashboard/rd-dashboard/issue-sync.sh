@@ -4,6 +4,14 @@ set -euo pipefail
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-${HOME}/.openclaw}"
 REPO_DIR="${REPO_DIR:-${OPENCLAW_PROJECT_DIR:-${HOME}/ai-agent-guide}}"
 REPO="${REPO:-${OPENCLAW_PROJECT_REPO:-owner/repo}}"
+if [[ "${REPO}" =~ ^https?://github\.com/([^/]+)/([^/?#]+)(\.git)?/?$ ]]; then
+  REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+elif [[ "${REPO}" =~ ^git@github\.com:([^/]+)/([^/?#]+)(\.git)?$ ]]; then
+  REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+elif [[ "${REPO}" =~ ^github\.com/([^/]+)/([^/?#]+)(\.git)?/?$ ]]; then
+  REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+fi
+REPO="${REPO%.git}"
 DEFAULT_ASSIGNEE="${DEFAULT_ASSIGNEE:-${REPO%%/*}}"
 OPENCLAW_CONFIG="${OPENCLAW_CONFIG:-${OPENCLAW_STATE_DIR}/openclaw.json}"
 MILESTONE_TITLE="${MILESTONE_TITLE:-${ISSUE_SYNC_MILESTONE_TITLE:-}}"
@@ -29,7 +37,7 @@ CRON_PIPELINE_TECH_JOB_ID="${CRON_PIPELINE_TECH_JOB_ID:-b6176298-dced-45f8-8c0f-
 CRON_PIPELINE_PRODUCT_JOB_ID="${CRON_PIPELINE_PRODUCT_JOB_ID:-8cd2277b-f3e2-4bdb-920c-1afa2ecd9fee}"
 CRON_PIPELINE_REVIEWER_JOB_ID="${CRON_PIPELINE_REVIEWER_JOB_ID:-23d1c9c1-91a6-4bfa-93fe-34cba20484e4}"
 CRON_PIPELINE_QA_JOB_ID="${CRON_PIPELINE_QA_JOB_ID:-2972505e-921d-4182-863d-ef7f048b8374}"
-CRON_GUARD_FEISHU_ACCOUNT="${CRON_GUARD_FEISHU_ACCOUNT:-hot-search}"
+CRON_GUARD_FEISHU_ACCOUNT="${CRON_GUARD_FEISHU_ACCOUNT:-${FEISHU_AI_ACCOUNT_ID:-ai-tech}}"
 CRON_GUARD_FEISHU_TARGET="${CRON_GUARD_FEISHU_TARGET:-oc_replace_with_group_id}"
 AUTO_MERGE_ENABLED="${AUTO_MERGE_ENABLED:-1}"
 AUTO_MERGE_OWNER_REGEX='^owner:(role-senior-dev|role-code-reviewer)$'
