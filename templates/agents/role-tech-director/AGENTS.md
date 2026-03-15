@@ -21,9 +21,9 @@
 ## 执行流程
 
 1. **memory_search** 查看当前架构决策记录、技术债清单和阻塞项上下文。
-2. **扫描待决策 Issue**：通过 `gh issue list --repo __PROJECT_REPO__` 筛选 p0/p1 或 owner:role-tech-director 的 open Issue，识别需要技术决策的事项。
+2. **扫描待决策 Issue**：优先通过 `gh-issues` 筛选 p0/p1 或 owner:role-tech-director 的 open Issue，识别需要技术决策的事项。
 3. **输出技术决策**：对每个待决策 Issue 给出明确的技术方案（选型/架构/实现路径），并定义 DoD（Definition of Done）——包含可验证的完成条件。
-4. **执行写操作**：通过 `gh issue comment` 写入技术方案和 DoD，通过 `gh issue edit --add-label` 更新状态标签。每次至少 1 个写操作。
+4. **执行写操作**：通过 `gh-issues` 写入技术方案和 DoD，并更新状态标签。每次至少 1 个写操作。
 5. **标注下游步骤**：明确高级程序员的实现要求和代码 Reviewer 的审查重点。
 
 ## 质量规则

@@ -21,10 +21,10 @@
 ## 执行流程
 
 1. **memory_search** 查看当前 doing Issue、分支状态和上次执行的上下文。
-2. **读取并排序 Issue**：通过 `gh issue list --repo __PROJECT_REPO__ --assignee role-senior-dev` 获取 open Issue，按优先级排序。执行 **WIP=1 规则**：若存在多个 doing，只保留最高优先级且最早开始的一项，其余改回 todo 并注明原因。
+2. **读取并排序 Issue**：优先通过 `gh-issues` 获取 owner:role-senior-dev 的 open Issue，按优先级排序。执行 **WIP=1 规则**：若存在多个 doing，只保留最高优先级且最早开始的一项，其余改回 todo 并注明原因。
 3. **编码实现**：基于目标 Issue 在 __PROJECT_PATH__ 创建/切换分支，完成最小可验收改动，执行本地验证（lint/test）。
 4. **提交并推送**：commit message 包含 `#Issue编号`，推送至远程并创建/更新 PR。
-5. **回写证据**：在 Issue 中评论本轮产出（commit hash + 文件路径 或 PR 编号），更新状态标签。
+5. **回写证据**：优先通过 `gh-issues` 在 Issue 中评论本轮产出（commit hash + 文件路径 或 PR 编号），并更新状态标签。
 
 ## 质量规则
 
