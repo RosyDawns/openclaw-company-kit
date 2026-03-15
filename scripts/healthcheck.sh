@@ -20,6 +20,7 @@ FAIL_COUNT_FILE="${HEALTH_STATE_DIR}/gateway_fail_count"
 HEALTH_SUMMARY_FILE="${HEALTH_STATE_DIR}/healthcheck-summary.json"
 DASHBOARD_DATA_SLA_MINUTES="${DASHBOARD_DATA_SLA_MINUTES:-15}"
 DASHBOARD_DATA_FILE="${TARGET_DASHBOARD_DIR}/dashboard-data.json"
+CONTROL_SERVER_PORT_FILE="${CONTROL_SERVER_PORT_FILE:-${HEALTH_STATE_DIR}/control-server-port}"
 
 EXIT_CODE=0
 SHOULD_RESTART_GATEWAY=0
@@ -29,6 +30,35 @@ declare -a CLASS_CATEGORIES=()
 declare -a CLASS_SEVERITIES=()
 declare -a CLASS_REASONS=()
 declare -a CLASS_ACTIONS=()
+declare -a DASHBOARD_HTTP_CANDIDATE_PORTS=()
+DASHBOARD_HTTP_PRIMARY_PORT="${DASHBOARD_PORT}"
+DASHBOARD_HTTP_PORT_SOURCE="env"
+
+is_valid_port() {
+  local candidate="${1:-}"
+  [[ "${candidate}" =~ ^[0-9]+$ ]] && [ "${candidate}" -ge 1 ] && [ "${candidate}" -le 65535 ]
+}
+
+resolve_dashboard_http_ports() {
+  local saved_port=""
+
+  DASHBOARD_HTTP_CANDIDATE_PORTS=()
+  DASHBOARD_HTTP_PRIMARY_PORT="${DASHBOARD_PORT}"
+  DASHBOARD_HTTP_PORT_SOURCE="env"
+
+  if [ -f "${CONTROL_SERVER_PORT_FILE}" ]; then
+    saved_port="$(head -n 1 "${CONTROL_SERVER_PORT_FILE}" | tr -d '[:space:]')"
+    if is_valid_port "${saved_port}"; then
+      DASHBOARD_HTTP_PRIMARY_PORT="${saved_port}"
+      DASHBOARD_HTTP_PORT_SOURCE="state-file"
+    fi
+  fi
+
+  DASHBOARD_HTTP_CANDIDATE_PORTS+=("${DASHBOARD_HTTP_PRIMARY_PORT}")
+  if [ "${DASHBOARD_HTTP_PRIMARY_PORT}" != "${DASHBOARD_PORT}" ]; then
+    DASHBOARD_HTTP_CANDIDATE_PORTS+=("${DASHBOARD_PORT}")
+  fi
+}
 
 add_classification() {
   local category="$1"
@@ -282,14 +312,31 @@ fi
 
 echo
 echo "=== Dashboard HTTP ==="
-if curl -sS -m 3 "http://127.0.0.1:${DASHBOARD_PORT}/" >/dev/null 2>&1; then
-  echo "  reachable: http://127.0.0.1:${DASHBOARD_PORT}"
+resolve_dashboard_http_ports
+
+dashboard_http_reachable_port=""
+for candidate_port in "${DASHBOARD_HTTP_CANDIDATE_PORTS[@]}"; do
+  if curl -sS -m 3 "http://127.0.0.1:${candidate_port}/" >/dev/null 2>&1; then
+    dashboard_http_reachable_port="${candidate_port}"
+    break
+  fi
+done
+
+if [ -n "${dashboard_http_reachable_port}" ]; then
+  echo "  reachable: http://127.0.0.1:${dashboard_http_reachable_port}"
+  if [ "${DASHBOARD_HTTP_PORT_SOURCE}" = "state-file" ]; then
+    echo "  port_source: ${CONTROL_SERVER_PORT_FILE}"
+  fi
+  if [ "${dashboard_http_reachable_port}" != "${DASHBOARD_HTTP_PRIMARY_PORT}" ]; then
+    echo "  fallback_to_env_port: ${DASHBOARD_PORT}"
+  fi
 else
-  echo "  NOT reachable on :${DASHBOARD_PORT}"
+  dashboard_probe_targets="$(IFS=,; echo "${DASHBOARD_HTTP_CANDIDATE_PORTS[*]}")"
+  echo "  NOT reachable on ports: ${dashboard_probe_targets}"
   add_classification \
     "gateway_fault" \
     "warning" \
-    "Dashboard HTTP 不可达 (127.0.0.1:${DASHBOARD_PORT})" \
+    "Dashboard HTTP 不可达 (127.0.0.1:${dashboard_probe_targets})" \
     "执行 bash scripts/start.sh，确认 control_server 与 dashboard 进程状态"
   max_exit_code 1
 fi
