@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Single-token GitHub bridge for agent exec environments where spaced commands
+# are mangled. Agents write a request JSON file, run this script, then read the
+# response JSON file.
+
+REQ_FILE="${GH_OP_REQUEST_FILE:-.ghissues_op_request.json}"
+RESP_FILE="${GH_OP_RESPONSE_FILE:-.ghissues_op_response.json}"
+
+action=""
+repo=""
+
+write_error() {
+  local msg="$1"
+  jq -n \
+    --arg action "${action}" \
+    --arg repo "${repo}" \
+    --arg error "${msg}" \
+    '{
+      ok: false,
+      action: $action,
+      repo: $repo,
+      error: $error,
+      ts: (now | todateiso8601)
+    }' > "${RESP_FILE}"
+}
+
+write_ok_data() {
+  local json_data="$1"
+  jq -n \
+    --arg action "${action}" \
+    --arg repo "${repo}" \
+    --argjson data "${json_data}" \
+    '{
+      ok: true,
+      action: $action,
+      repo: $repo,
+      data: $data,
+      ts: (now | todateiso8601)
+    }' > "${RESP_FILE}"
+}
+
+write_ok_url() {
+  local url="$1"
+  jq -n \
+    --arg action "${action}" \
+    --arg repo "${repo}" \
+    --arg url "${url}" \
+    '{
+      ok: true,
+      action: $action,
+      repo: $repo,
+      url: $url,
+      ts: (now | todateiso8601)
+    }' > "${RESP_FILE}"
+}
+
+resolve_gh_token() {
+  if [ -n "${GH_TOKEN:-}" ]; then
+    return 0
+  fi
+
+  local candidate token
+  for candidate in \
+    "${OPENCLAW_CONFIG:-}" \
+    "${HOME}/.openclaw-zhiyun/openclaw.json" \
+    "${HOME}/.openclaw/openclaw.json"
+  do
+    if [ -n "${candidate}" ] && [ -f "${candidate}" ]; then
+      token="$(jq -r '.skills.entries["gh-issues"].apiKey // empty' "${candidate}" 2>/dev/null || true)"
+      if [ -n "${token}" ]; then
+        export GH_TOKEN="${token}"
+        return 0
+      fi
+    fi
+  done
+
+  return 1
+}
+
+run_or_error() {
+  local output
+  if ! output="$("$@" 2>&1)"; then
+    write_error "command failed: $* | ${output}"
+    echo "${RESP_FILE}"
+    exit 0
+  fi
+  printf '%s' "${output}"
+}
+
+if [ ! -f "${REQ_FILE}" ]; then
+  write_error "missing request file: ${REQ_FILE}"
+  echo "${RESP_FILE}"
+  exit 0
+fi
+
+if ! jq -e . "${REQ_FILE}" >/dev/null 2>&1; then
+  write_error "invalid request json: ${REQ_FILE}"
+  echo "${RESP_FILE}"
+  exit 0
+fi
+
+action="$(jq -r '.action // empty' "${REQ_FILE}")"
+repo="$(jq -r '.repo // empty' "${REQ_FILE}")"
+
+if [ -z "${action}" ]; then
+  write_error "missing action"
+  echo "${RESP_FILE}"
+  exit 0
+fi
+
+if [ -z "${repo}" ]; then
+  write_error "missing repo (expected owner/repo)"
+  echo "${RESP_FILE}"
+  exit 0
+fi
+
+if ! resolve_gh_token; then
+  write_error "GH_TOKEN unavailable (set env or skills.entries.gh-issues.apiKey)"
+  echo "${RESP_FILE}"
+  exit 0
+fi
+
+case "${action}" in
+  list_issues)
+    state="$(jq -r '.state // "open"' "${REQ_FILE}")"
+    limit="$(jq -r '.limit // 50' "${REQ_FILE}")"
+    fields="$(jq -r '.fields // "number,title,labels,assignees,url"' "${REQ_FILE}")"
+    data="$(run_or_error gh issue list --repo "${repo}" --state "${state}" --limit "${limit}" --json "${fields}")"
+    if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
+      write_error "unexpected non-json response from gh issue list: ${data}"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    write_ok_data "${data}"
+    ;;
+
+  list_prs)
+    state="$(jq -r '.state // "open"' "${REQ_FILE}")"
+    limit="$(jq -r '.limit // 50' "${REQ_FILE}")"
+    fields="$(jq -r '.fields // "number,title,headRefName,baseRefName,url"' "${REQ_FILE}")"
+    data="$(run_or_error gh pr list --repo "${repo}" --state "${state}" --limit "${limit}" --json "${fields}")"
+    if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
+      write_error "unexpected non-json response from gh pr list: ${data}"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    write_ok_data "${data}"
+    ;;
+
+  view_issue)
+    number="$(jq -r '.number // empty' "${REQ_FILE}")"
+    fields="$(jq -r '.fields // "number,title,state,labels,assignees,url,body"' "${REQ_FILE}")"
+    if [ -z "${number}" ]; then
+      write_error "missing number for view_issue"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    data="$(run_or_error gh issue view "${number}" --repo "${repo}" --json "${fields}")"
+    if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
+      write_error "unexpected non-json response from gh issue view: ${data}"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    write_ok_data "${data}"
+    ;;
+
+  view_pr)
+    number="$(jq -r '.number // empty' "${REQ_FILE}")"
+    fields="$(jq -r '.fields // "number,title,state,url,headRefName,baseRefName,author"' "${REQ_FILE}")"
+    if [ -z "${number}" ]; then
+      write_error "missing number for view_pr"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    data="$(run_or_error gh pr view "${number}" --repo "${repo}" --json "${fields}")"
+    if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
+      write_error "unexpected non-json response from gh pr view: ${data}"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    write_ok_data "${data}"
+    ;;
+
+  create_issue)
+    title="$(jq -r '.title // empty' "${REQ_FILE}")"
+    body="$(jq -r '.body // ""' "${REQ_FILE}")"
+    labels_csv="$(jq -r '.labels // [] | map(tostring) | join(",")' "${REQ_FILE}")"
+    assignees_csv="$(jq -r '.assignees // [] | map(tostring) | join(",")' "${REQ_FILE}")"
+    if [ -z "${title}" ]; then
+      write_error "missing title for create_issue"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    cmd=(gh issue create --repo "${repo}" --title "${title}" --body "${body}")
+    if [ -n "${labels_csv}" ]; then
+      cmd+=(--label "${labels_csv}")
+    fi
+    if [ -n "${assignees_csv}" ]; then
+      cmd+=(--assignee "${assignees_csv}")
+    fi
+    output="$(run_or_error "${cmd[@]}")"
+    url="$(printf '%s\n' "${output}" | tail -n 1 | tr -d '\r')"
+    write_ok_url "${url}"
+    ;;
+
+  comment_issue)
+    number="$(jq -r '.number // empty' "${REQ_FILE}")"
+    body="$(jq -r '.body // empty' "${REQ_FILE}")"
+    if [ -z "${number}" ] || [ -z "${body}" ]; then
+      write_error "missing number/body for comment_issue"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    output="$(run_or_error gh issue comment "${number}" --repo "${repo}" --body "${body}")"
+    url="$(printf '%s\n' "${output}" | tail -n 1 | tr -d '\r')"
+    write_ok_url "${url}"
+    ;;
+
+  comment_pr)
+    number="$(jq -r '.number // empty' "${REQ_FILE}")"
+    body="$(jq -r '.body // empty' "${REQ_FILE}")"
+    if [ -z "${number}" ] || [ -z "${body}" ]; then
+      write_error "missing number/body for comment_pr"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    output="$(run_or_error gh pr comment "${number}" --repo "${repo}" --body "${body}")"
+    url="$(printf '%s\n' "${output}" | tail -n 1 | tr -d '\r')"
+    write_ok_url "${url}"
+    ;;
+
+  set_labels)
+    number="$(jq -r '.number // empty' "${REQ_FILE}")"
+    add_csv="$(jq -r '.add // [] | map(tostring) | join(",")' "${REQ_FILE}")"
+    remove_csv="$(jq -r '.remove // [] | map(tostring) | join(",")' "${REQ_FILE}")"
+    if [ -z "${number}" ]; then
+      write_error "missing number for set_labels"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    if [ -n "${add_csv}" ]; then
+      run_or_error gh issue edit "${number}" --repo "${repo}" --add-label "${add_csv}" >/dev/null
+    fi
+    if [ -n "${remove_csv}" ]; then
+      run_or_error gh issue edit "${number}" --repo "${repo}" --remove-label "${remove_csv}" >/dev/null
+    fi
+    data="$(run_or_error gh issue view "${number}" --repo "${repo}" --json number,title,state,url,labels)"
+    if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
+      write_error "unexpected non-json response from gh issue view after set_labels: ${data}"
+      echo "${RESP_FILE}"
+      exit 0
+    fi
+    write_ok_data "${data}"
+    ;;
+
+  *)
+    write_error "unsupported action: ${action}"
+    ;;
+esac
+
+echo "${RESP_FILE}"
+exit 0

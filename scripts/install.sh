@@ -332,6 +332,10 @@ for agent_id in ai-tech rd-company role-product role-tech-director role-senior-d
         "${TARGET_AGENTS_DIR}/${agent_id}/${mdfile}"
     fi
   done
+  if [ -f "${ROOT_DIR}/templates/bin/ghissues_op" ]; then
+    cp "${ROOT_DIR}/templates/bin/ghissues_op" "${TARGET_AGENTS_DIR}/${agent_id}/ghissues_op"
+    chmod +x "${TARGET_AGENTS_DIR}/${agent_id}/ghissues_op"
+  fi
 done
 
 WORKFLOW_TEMPLATE_ID="default"
@@ -413,12 +417,12 @@ jq \
      "subagents":{"allowAgents":["role-tech-director","role-senior-dev","role-code-reviewer","role-qa-test","role-product","role-growth"]}},
     {"id":"role-product","name":"产品经理","workspace":($stateDir + "/agents/role-product"),
      "identity":{"name":"产品经理"},
-     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
-              "deny":["write","edit","apply_patch"]}},
+     "tools":{"allow":["exec","read","write","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["edit","apply_patch"]}},
     {"id":"role-tech-director","name":"技术总监","workspace":($stateDir + "/agents/role-tech-director"),
      "identity":{"name":"技术总监"},
-     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
-              "deny":["write","edit","apply_patch"]},
+     "tools":{"allow":["exec","read","write","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["edit","apply_patch"]},
      "subagents":{"allowAgents":["role-senior-dev","role-code-reviewer"]}},
     {"id":"role-senior-dev","name":"高级程序员","workspace":($stateDir + "/agents/role-senior-dev"),
      "identity":{"name":"高级程序员"},
@@ -429,12 +433,12 @@ jq \
      "tools":{"deny":["exec","group:runtime","group:fs","group:sessions"]}},
     {"id":"role-code-reviewer","name":"代码Reviewer","workspace":($stateDir + "/agents/role-code-reviewer"),
      "identity":{"name":"代码Reviewer"},
-     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
-              "deny":["write","edit","apply_patch"]}},
+     "tools":{"allow":["exec","read","write","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["edit","apply_patch"]}},
     {"id":"role-qa-test","name":"测试工程师","workspace":($stateDir + "/agents/role-qa-test"),
      "identity":{"name":"测试工程师"},
-     "tools":{"allow":["exec","read","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
-              "deny":["write","edit","apply_patch"]}}
+     "tools":{"allow":["exec","read","write","gh-issues","sessions_send","sessions_list","sessions_history","session_status"],
+              "deny":["edit","apply_patch"]}}
   ] |
   .bindings = [
     {

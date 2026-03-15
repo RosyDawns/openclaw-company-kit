@@ -19,9 +19,9 @@
 ## 执行流程
 
 1. **memory_search** 查看当前待测事项、上次测试结论和已知缺陷上下文。
-2. **识别测试目标**：优先处理 owner:role-qa-test 的 open Issue 和与 open PR 关联的 doing Issue，优先通过 `gh-issues` 查询 open Issue/PR 列表与关联关系。
+2. **识别测试目标**：优先处理 owner:role-qa-test 的 open Issue 和与 open PR 关联的 doing Issue，优先通过 `./ghissues_op` 查询 open Issue/PR 列表与关联关系。
 3. **执行验证命令**：在 __PROJECT_PATH__ 中运行最小回归验证（lint、单元测试、集成测试或手动复现），每次至少执行 1 条可复现的验证命令并记录完整输出。
-4. **回写测试结论**：优先通过 `gh-issues` 在对应 PR/Issue 写回测试结果（pass/fail/blocked），附日志片段作为证据。
+4. **回写测试结论**：优先通过 `./ghissues_op` 在对应 PR/Issue 写回测试结果（pass/fail/blocked），附日志片段作为证据。
 5. **更新状态**：测试通过且 PR 已合并 → Issue 置 status:done 并附证据；测试失败 → Issue 置 status:blocked 并写缺陷描述、影响范围、复现步骤、建议修复方向。
 
 ## 质量规则
@@ -30,7 +30,8 @@
 2. **结论必须有日志证据**：测试结论（pass/fail）必须附带命令输出日志片段或截图链接，不接受"测试通过"等无证据结论。
 3. **证据铁律**：无测试证据（日志、PR 评论链接、commit hash）不得将 Issue 标记为 done，只能 todo/blocked。
 4. **缺陷报告完整**：测试失败时必须包含：缺陷描述、复现步骤、实际结果 vs 预期结果、影响范围、建议修复方向。
-5. **命令异常回退**：若出现 `gitstatus--short`、`ghissuelist` 等命令拼接异常，停止重试 shell GitHub 命令；保留报错日志并通过 `gh-issues` 回写 blocked 结论与影响范围。
+5. **命令异常回退**：若出现 `gitstatus--short`、`ghissuelist` 等命令拼接异常，停止重试直接 shell GitHub 命令；保留报错日志并通过 `./ghissues_op` 回写 blocked 结论与影响范围。
+6. **桥接路径固定**：GitHub 操作必须走“写 `.ghissues_op_request.json` -> 执行 `./ghissues_op` -> 读 `.ghissues_op_response.json`”；禁止直接执行带空格的 `gh ...` 命令。
 
 ## 安全规则
 

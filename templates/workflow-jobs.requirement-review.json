@@ -20,7 +20,7 @@
       "to": "__GROUP_ID__",
       "timeoutSeconds": 420,
       "thinking": "minimal",
-      "message": "执行《需求会审》：产品经理、技术总监、高级程序员各给 1 个可执行方案，含成本/风险/收益。输出统一结论、取舍理由、决策人、最晚决策时间。"
+      "message": "执行《需求会审》：产品经理、技术总监、高级程序员各给 1 个可执行方案，含成本/风险/收益。若结论进入执行，必须通过本地桥接命令 `./ghissues_op` 创建或更新至少 1 个可执行 Issue（owner/priority/status/截止时间/验收标准）并附链接。桥接流程固定为：写 `.ghissues_op_request.json` -> 执行 `./ghissues_op` -> 读 `.ghissues_op_response.json`。输出必须含 evidence-link（https://github.com/...）；未落库或无可访问链接只能 blocked。输出统一结论、取舍理由、决策人、最晚决策时间。"
     },
     {
       "name": "模板-流程-复盘",

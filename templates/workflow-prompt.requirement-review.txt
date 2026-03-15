@@ -4,3 +4,6 @@
 1) 先明确需求目标、边界、验收标准，再分配研发动作。
 2) 每次评审必须输出：方案候选、取舍理由、风险清单、责任人与截止时间。
 3) 若缺少证据或输入不完整，状态只能 todo/blocked，不得宣称 done。
+4) 若会审结论进入执行，必须通过 `./ghissues_op` 创建/更新至少 1 个可执行 Issue（owner/priority/status/截止时间/验收标准），并附 Issue 链接。
+5) GitHub 操作流程固定为：写 `.ghissues_op_request.json` -> 执行 `./ghissues_op` -> 读 `.ghissues_op_response.json`。禁止直接执行带空格的 `gh ...` 命令。
+6) 若未输出可访问的 `https://github.com/...` 证据链接，视为未落库，状态必须 blocked。
