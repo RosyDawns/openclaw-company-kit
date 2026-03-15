@@ -56,6 +56,13 @@ Optional (issue-sync):
 bash scripts/install.sh
 ```
 
+Bridge script deployment (`./ghissues_op`) is included in install by default.
+Manual re-deploy:
+
+```bash
+bash scripts/install-gh-bridge.sh
+```
+
 ## 4) Start Services
 
 ```bash

@@ -6,6 +6,7 @@ cd "${ROOT_DIR}"
 
 bash -n scripts/_common.sh
 bash -n scripts/install.sh
+bash -n scripts/install-gh-bridge.sh
 bash -n scripts/install-cron.sh
 bash -n scripts/bootstrap.sh
 bash -n scripts/launch.sh

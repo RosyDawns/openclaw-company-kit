@@ -310,6 +310,14 @@ fi
 echo "[install] profile=${OPENCLAW_PROFILE}"
 echo "[install] config=${PROFILE_DIR}/openclaw.json"
 
+if [ "${SYNC_PROJECT_GH_BRIDGE}" = "1" ]; then
+  bridge_args=(--target "${PROJECT_PATH}")
+  if [ "${SYNC_PROJECT_GH_BRIDGE_STRICT}" = "1" ]; then
+    bridge_args+=(--strict)
+  fi
+  "${ROOT_DIR}/scripts/install-gh-bridge.sh" "${bridge_args[@]}"
+fi
+
 PRIMARY_FEISHU_ACCOUNT_ID="${FEISHU_AI_ACCOUNT_ID}"
 PRIMARY_FEISHU_BOT_NAME="${FEISHU_AI_BOT_NAME}"
 PRIMARY_FEISHU_APP_ID="${FEISHU_AI_APP_ID}"
@@ -391,6 +399,10 @@ jq \
   --arg projectPath "${PROJECT_PATH}" \
   --arg projectRepo "${PROJECT_REPO}" \
   --arg primaryAccount "${PRIMARY_FEISHU_ACCOUNT_ID}" \
+  --arg aiAccount "${PRIMARY_FEISHU_ACCOUNT_ID}" \
+  --arg aiAppId "${PRIMARY_FEISHU_APP_ID}" \
+  --arg aiAppSecret "${PRIMARY_FEISHU_APP_SECRET}" \
+  --arg aiBotName "${PRIMARY_FEISHU_BOT_NAME}" \
   --arg primaryAppId "${PRIMARY_FEISHU_APP_ID}" \
   --arg primaryAppSecret "${PRIMARY_FEISHU_APP_SECRET}" \
   --arg primaryBotName "${PRIMARY_FEISHU_BOT_NAME}" \
@@ -450,24 +462,33 @@ jq \
   ] |
   .channels = (.channels // {}) |
   .channels.feishu = ((.channels.feishu // {}) + {"enabled":true,"domain":"feishu"}) |
-  .channels.feishu.accounts = {
-    ($primaryAccount): {
-      "enabled": true,
-      "appId": $primaryAppId,
-      "appSecret": $primaryAppSecret,
-      "botName": $primaryBotName,
-      "dmPolicy": "allowlist",
-      "groupPolicy": "allowlist",
-      "allowFrom": $allowFrom,
-      "groupAllowFrom": $allowFrom
-    },
-    "default": {
-      "groupPolicy": "allowlist",
-      "dmPolicy": "allowlist",
-      "allowFrom": $allowFrom,
-      "groupAllowFrom": $allowFrom
-    }
-  } |
+  .channels.feishu.accounts = (
+    ((.channels.feishu.accounts // {}) | del(.[$aiAccount])) as $accounts |
+    ($accounts + {
+      "default": {
+        "groupPolicy": "allowlist",
+        "dmPolicy": "allowlist",
+        "allowFrom": $allowFrom,
+        "groupAllowFrom": $allowFrom
+      }
+    }) |
+    if $aiAppId != "" and $aiAppSecret != "" then
+      . + {
+        ($aiAccount): {
+          "enabled": true,
+          "appId": $aiAppId,
+          "appSecret": $aiAppSecret,
+          "botName": $aiBotName,
+          "dmPolicy": "allowlist",
+          "groupPolicy": "allowlist",
+          "allowFrom": $allowFrom,
+          "groupAllowFrom": $allowFrom
+        }
+      }
+    else
+      del(.[$aiAccount])
+    end
+  ) |
   .channels.feishu.groups = ((.channels.feishu.groups // {}) + {
     ($groupId): {
       "requireMention": false,

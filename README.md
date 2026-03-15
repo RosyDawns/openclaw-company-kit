@@ -141,6 +141,7 @@ make start
 |------|------|
 | `make launch` | 一键启动（环境检测 + Web 配置） |
 | `make install` | 安装配置到 profile |
+| `make bridge` | 将 `ghissues_op` 下发到 `PROJECT_PATH` 项目根目录 |
 | `make start` | 启动所有服务 |
 | `make stop` | 停止所有服务 |
 | `make health` | 健康检查 |
@@ -168,6 +169,8 @@ make start
 | `CONTROL_TOKEN` | 可选 | 配置中心 API 认证 Token |
 | `REFRESH_INTERVAL` | 可选 | 驾驶舱刷新间隔（默认 300s） |
 | `OPENCLAW_ALLOW_NO_GH` | 可选 | 允许缺少 gh CLI 启动（GitHub 同步能力降级） |
+| `SYNC_PROJECT_GH_BRIDGE` | 可选 | 安装时是否自动下发 `ghissues_op` 到 `PROJECT_PATH`（默认 `1`） |
+| `SYNC_PROJECT_GH_BRIDGE_STRICT` | 可选 | 下发失败是否让安装失败（默认 `0`，仅告警） |
 | `BACKUP_INCLUDE_TASK_SUMMARY` | 可选 | 备份时包含近 N 天任务摘要与审计日志（默认关闭） |
 | `BACKUP_TASK_SUMMARY_DAYS` | 可选 | 备份摘要窗口天数（默认 7） |
 

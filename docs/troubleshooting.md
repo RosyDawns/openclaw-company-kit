@@ -106,6 +106,7 @@ Check:
 - `.env` has `GH_TOKEN`
 - `gh auth status`
 - repository slug in `PROJECT_REPO`
+- target repo root has `./ghissues_op` (run `make bridge` to re-deploy)
 
 If `launch.sh` stops at `missing command: gh`:
 

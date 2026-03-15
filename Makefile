@@ -1,10 +1,13 @@
-.PHONY: launch install start stop health check backup restore clean hook
+.PHONY: launch install bridge start stop health check backup restore clean hook
 
 launch:
 	bash scripts/launch.sh
 
 install:
 	bash scripts/install.sh
+
+bridge:
+	bash scripts/install-gh-bridge.sh
 
 start:
 	bash scripts/start.sh
