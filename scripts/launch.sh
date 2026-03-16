@@ -22,6 +22,14 @@ mkdir -p "${RUN_DIR}"
 echo "环境检测："
 check_cmds
 
+if [ "${SYNC_PROJECT_GH_BRIDGE}" = "1" ]; then
+  bridge_args=(--target "${PROJECT_PATH}")
+  if [ "${SYNC_PROJECT_GH_BRIDGE_STRICT}" = "1" ]; then
+    bridge_args+=(--strict)
+  fi
+  "${ROOT_DIR}/scripts/install-gh-bridge.sh" "${bridge_args[@]}"
+fi
+
 # GH_TOKEN / gh auth 软检测（非阻塞）
 if command -v gh >/dev/null 2>&1; then
   if [ -z "${GH_TOKEN:-}" ] && ! gh auth status >/dev/null 2>&1; then

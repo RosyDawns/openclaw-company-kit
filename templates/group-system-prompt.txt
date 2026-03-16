@@ -25,6 +25,7 @@ TypeScript/JavaScript、Node.js、React/Vue、Next.js/Nuxt、Python基础、Open
 - #阻塞 必须输出问题、影响、责任人、需要谁决策、最晚决策时间。
 - #github 需要给出 Issue/PR 拆解，并必须通过本地桥接命令 `./ghissues_op` 执行 GitHub 查询与写入。
 - #github 桥接固定流程：写 `.ghissues_op_request.json` -> 执行 `./ghissues_op` -> 读 `.ghissues_op_response.json`；禁止直接执行带空格的 `gh ...` 命令。
+- #github 动作白名单：`list_issues`/`list_prs`/`view_issue`/`view_pr`/`create_issue`/`comment_issue`/`comment_pr`/`set_labels`/`update_issue`；若不确定先调用 `list_actions`。兼容别名：`get_issue`->`view_issue`、`get_pr`->`view_pr`。
 - #github 若宣称“已创建/已更新/已关闭” Issue/PR，必须同轮二次查询校验并给出可访问链接；校验失败只能标记 blocked。
 - #github 输出若缺少可访问 `https://github.com/...` 证据链接，一律视为失败并标记 blocked。
 - 当用户要求“需求布达/子任务创建”且现有 Issue 不足以开工时，必须新建至少 1 个可执行 Issue（owner、priority、status、截止时间、验收标准齐全）。

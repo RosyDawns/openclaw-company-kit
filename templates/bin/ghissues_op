@@ -10,6 +10,7 @@ RESP_FILE="${GH_OP_RESPONSE_FILE:-.ghissues_op_response.json}"
 
 action=""
 repo=""
+RUN_OUTPUT=""
 
 write_error() {
   local msg="$1"
@@ -56,6 +57,39 @@ write_ok_url() {
     }' > "${RESP_FILE}"
 }
 
+write_capabilities() {
+  local json_data
+  json_data='{
+    "canonical": [
+      "list_actions",
+      "list_issues",
+      "list_prs",
+      "view_issue",
+      "view_pr",
+      "create_issue",
+      "comment_issue",
+      "comment_pr",
+      "set_labels",
+      "update_issue"
+    ],
+    "aliases": {
+      "list": "list_issues",
+      "list_pr": "list_prs",
+      "list_pulls": "list_prs",
+      "list_pull_requests": "list_prs",
+      "get_issue": "view_issue",
+      "read_issue": "view_issue",
+      "get_pr": "view_pr",
+      "read_pr": "view_pr",
+      "issue_create": "create_issue",
+      "issue_comment": "comment_issue",
+      "pr_comment": "comment_pr",
+      "edit_issue": "update_issue"
+    }
+  }'
+  write_ok_data "${json_data}"
+}
+
 resolve_gh_token() {
   if [ -n "${GH_TOKEN:-}" ]; then
     return 0
@@ -86,7 +120,7 @@ run_or_error() {
     echo "${RESP_FILE}"
     exit 0
   fi
-  printf '%s' "${output}"
+  RUN_OUTPUT="${output}"
 }
 
 if [ ! -f "${REQ_FILE}" ]; then
@@ -110,6 +144,14 @@ if [ -z "${action}" ]; then
   exit 0
 fi
 
+case "${action}" in
+  list_actions|actions|capabilities|help)
+    write_capabilities
+    echo "${RESP_FILE}"
+    exit 0
+    ;;
+esac
+
 if [ -z "${repo}" ]; then
   write_error "missing repo (expected owner/repo)"
   echo "${RESP_FILE}"
@@ -127,7 +169,8 @@ case "${action}" in
     state="$(jq -r '.state // "open"' "${REQ_FILE}")"
     limit="$(jq -r '.limit // 50' "${REQ_FILE}")"
     fields="$(jq -r '.fields // "number,title,labels,assignees,url"' "${REQ_FILE}")"
-    data="$(run_or_error gh issue list --repo "${repo}" --state "${state}" --limit "${limit}" --json "${fields}")"
+    run_or_error gh issue list --repo "${repo}" --state "${state}" --limit "${limit}" --json "${fields}"
+    data="${RUN_OUTPUT}"
     if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
       write_error "unexpected non-json response from gh issue list: ${data}"
       echo "${RESP_FILE}"
@@ -136,11 +179,12 @@ case "${action}" in
     write_ok_data "${data}"
     ;;
 
-  list_prs)
+  list_prs|list_pr|list_pulls|list_pull_requests)
     state="$(jq -r '.state // "open"' "${REQ_FILE}")"
     limit="$(jq -r '.limit // 50' "${REQ_FILE}")"
     fields="$(jq -r '.fields // "number,title,headRefName,baseRefName,url"' "${REQ_FILE}")"
-    data="$(run_or_error gh pr list --repo "${repo}" --state "${state}" --limit "${limit}" --json "${fields}")"
+    run_or_error gh pr list --repo "${repo}" --state "${state}" --limit "${limit}" --json "${fields}"
+    data="${RUN_OUTPUT}"
     if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
       write_error "unexpected non-json response from gh pr list: ${data}"
       echo "${RESP_FILE}"
@@ -149,7 +193,7 @@ case "${action}" in
     write_ok_data "${data}"
     ;;
 
-  view_issue)
+  view_issue|get_issue|read_issue)
     number="$(jq -r '.number // empty' "${REQ_FILE}")"
     fields="$(jq -r '.fields // "number,title,state,labels,assignees,url,body"' "${REQ_FILE}")"
     if [ -z "${number}" ]; then
@@ -157,7 +201,8 @@ case "${action}" in
       echo "${RESP_FILE}"
       exit 0
     fi
-    data="$(run_or_error gh issue view "${number}" --repo "${repo}" --json "${fields}")"
+    run_or_error gh issue view "${number}" --repo "${repo}" --json "${fields}"
+    data="${RUN_OUTPUT}"
     if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
       write_error "unexpected non-json response from gh issue view: ${data}"
       echo "${RESP_FILE}"
@@ -166,7 +211,7 @@ case "${action}" in
     write_ok_data "${data}"
     ;;
 
-  view_pr)
+  view_pr|get_pr|read_pr)
     number="$(jq -r '.number // empty' "${REQ_FILE}")"
     fields="$(jq -r '.fields // "number,title,state,url,headRefName,baseRefName,author"' "${REQ_FILE}")"
     if [ -z "${number}" ]; then
@@ -174,7 +219,8 @@ case "${action}" in
       echo "${RESP_FILE}"
       exit 0
     fi
-    data="$(run_or_error gh pr view "${number}" --repo "${repo}" --json "${fields}")"
+    run_or_error gh pr view "${number}" --repo "${repo}" --json "${fields}"
+    data="${RUN_OUTPUT}"
     if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
       write_error "unexpected non-json response from gh pr view: ${data}"
       echo "${RESP_FILE}"
@@ -183,7 +229,7 @@ case "${action}" in
     write_ok_data "${data}"
     ;;
 
-  create_issue)
+  create_issue|issue_create)
     title="$(jq -r '.title // empty' "${REQ_FILE}")"
     body="$(jq -r '.body // ""' "${REQ_FILE}")"
     labels_csv="$(jq -r '.labels // [] | map(tostring) | join(",")' "${REQ_FILE}")"
@@ -200,12 +246,13 @@ case "${action}" in
     if [ -n "${assignees_csv}" ]; then
       cmd+=(--assignee "${assignees_csv}")
     fi
-    output="$(run_or_error "${cmd[@]}")"
+    run_or_error "${cmd[@]}"
+    output="${RUN_OUTPUT}"
     url="$(printf '%s\n' "${output}" | tail -n 1 | tr -d '\r')"
     write_ok_url "${url}"
     ;;
 
-  comment_issue)
+  comment_issue|issue_comment|add_issue_comment)
     number="$(jq -r '.number // empty' "${REQ_FILE}")"
     body="$(jq -r '.body // empty' "${REQ_FILE}")"
     if [ -z "${number}" ] || [ -z "${body}" ]; then
@@ -213,12 +260,13 @@ case "${action}" in
       echo "${RESP_FILE}"
       exit 0
     fi
-    output="$(run_or_error gh issue comment "${number}" --repo "${repo}" --body "${body}")"
+    run_or_error gh issue comment "${number}" --repo "${repo}" --body "${body}"
+    output="${RUN_OUTPUT}"
     url="$(printf '%s\n' "${output}" | tail -n 1 | tr -d '\r')"
     write_ok_url "${url}"
     ;;
 
-  comment_pr)
+  comment_pr|pr_comment|add_pr_comment)
     number="$(jq -r '.number // empty' "${REQ_FILE}")"
     body="$(jq -r '.body // empty' "${REQ_FILE}")"
     if [ -z "${number}" ] || [ -z "${body}" ]; then
@@ -226,12 +274,13 @@ case "${action}" in
       echo "${RESP_FILE}"
       exit 0
     fi
-    output="$(run_or_error gh pr comment "${number}" --repo "${repo}" --body "${body}")"
+    run_or_error gh pr comment "${number}" --repo "${repo}" --body "${body}"
+    output="${RUN_OUTPUT}"
     url="$(printf '%s\n' "${output}" | tail -n 1 | tr -d '\r')"
     write_ok_url "${url}"
     ;;
 
-  set_labels|update_issue)
+  set_labels|update_issue|edit_issue)
     number="$(jq -r '.number // empty' "${REQ_FILE}")"
     add_csv="$(jq -r '.add // [] | map(tostring) | join(",")' "${REQ_FILE}")"
     remove_csv="$(jq -r '.remove // [] | map(tostring) | join(",")' "${REQ_FILE}")"
@@ -245,18 +294,19 @@ case "${action}" in
       exit 0
     fi
     if [ -n "${add_csv}" ]; then
-      run_or_error gh issue edit "${number}" --repo "${repo}" --add-label "${add_csv}" >/dev/null
+      run_or_error gh issue edit "${number}" --repo "${repo}" --add-label "${add_csv}"
     fi
     if [ -n "${remove_csv}" ]; then
-      run_or_error gh issue edit "${number}" --repo "${repo}" --remove-label "${remove_csv}" >/dev/null
+      run_or_error gh issue edit "${number}" --repo "${repo}" --remove-label "${remove_csv}"
     fi
     if [ "${title_has}" = "true" ]; then
-      run_or_error gh issue edit "${number}" --repo "${repo}" --title "${title}" >/dev/null
+      run_or_error gh issue edit "${number}" --repo "${repo}" --title "${title}"
     fi
     if [ "${body_has}" = "true" ]; then
-      run_or_error gh issue edit "${number}" --repo "${repo}" --body "${body}" >/dev/null
+      run_or_error gh issue edit "${number}" --repo "${repo}" --body "${body}"
     fi
-    data="$(run_or_error gh issue view "${number}" --repo "${repo}" --json number,title,state,url,labels)"
+    run_or_error gh issue view "${number}" --repo "${repo}" --json number,title,state,url,labels
+    data="${RUN_OUTPUT}"
     if ! jq -e . >/dev/null 2>&1 <<<"${data}"; then
       write_error "unexpected non-json response from gh issue view after ${action}: ${data}"
       echo "${RESP_FILE}"
