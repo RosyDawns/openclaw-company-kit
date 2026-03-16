@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClaw 驾驶舱 · 测试工程师</title>
+    <link rel="stylesheet" href="./vue-dashboard.css" />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="./vue-dashboard-helpers.js"></script>
+    <script src="./vue-dashboard.js"></script>
+    <script>
+      window.createDashboardApp({ mountId: "#app", view: "role-qa-test" });
+    </script>
+  </body>
+</html>

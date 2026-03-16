@@ -1,0 +1,126 @@
+(function () {
+  function sanitizeFragment(fragment) {
+    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT);
+    const blockedTags = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META"]);
+    while (walker.nextNode()) {
+      const el = walker.currentNode;
+      if (blockedTags.has(el.tagName)) {
+        el.remove();
+        continue;
+      }
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        const value = String(attr.value || "");
+        if (/^on/i.test(name)) {
+          el.removeAttribute(attr.name);
+          continue;
+        }
+        if ((name === "href" || name === "src" || name === "xlink:href" || name === "formaction") && /^\s*javascript:/i.test(value)) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    }
+  }
+
+  function setSafeHTML(host, html) {
+    if (!host) return;
+    const template = document.createElement("template");
+    template.innerHTML = String(html || "");
+    sanitizeFragment(template.content);
+    host.replaceChildren();
+    host.appendChild(template.content.cloneNode(true));
+  }
+
+  function renderViewButtons(host, views, activeView, onSelect) {
+    if (!host) return;
+    host.replaceChildren();
+    for (const v of views || []) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nav-btn" + (String(v.id || "") === String(activeView || "") ? " active" : "");
+      button.dataset.view = String(v.id || "");
+      button.textContent = String(v.label || v.id || "未知视角");
+      button.addEventListener("click", () => {
+        if (typeof onSelect === "function") onSelect(String(v.id || ""));
+      });
+      host.appendChild(button);
+    }
+  }
+
+  function renderTargetButtons(host, targets, onSelect) {
+    if (!host) return;
+    host.replaceChildren();
+    for (const t of targets || []) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nav-btn";
+      button.dataset.target = String(t.id || "");
+      button.textContent = String(t.label || t.id || "段落");
+      button.addEventListener("click", () => {
+        if (typeof onSelect === "function") onSelect(String(t.id || ""));
+      });
+      host.appendChild(button);
+    }
+  }
+
+  function detectRuntimeHealth(data) {
+    const checks = [];
+    const nowMs = Date.now();
+    const generatedAtMs = Date.parse(String(data?.generatedAt || "").replace(" ", "T"));
+    const maxAgeMinutes = Number(data?.sla?.dashboardDataMaxAgeMinutes || 15);
+    if (Number.isFinite(generatedAtMs) && generatedAtMs > 0) {
+      const ageMinutes = Math.floor((nowMs - generatedAtMs) / 60000);
+      if (ageMinutes > maxAgeMinutes) {
+        checks.push({
+          category: "data_lag",
+          level: "error",
+          summary: `dashboard-data 延迟 ${ageMinutes} 分钟（阈值 ${maxAgeMinutes}）`,
+          action: "执行 refresh.sh 并检查 dashboard-refresh-loop",
+        });
+      }
+    }
+
+    if (data?.github?.ok === false) {
+      checks.push({
+        category: "github_unavailable",
+        level: "error",
+        summary: "GitHub 数据源不可用",
+        action: "检查 GH_TOKEN、repo slug 与 gh auth 状态",
+      });
+    }
+
+    const cron = Array.isArray(data?.cronJobs) ? data.cronJobs : [];
+    const badCron = cron.filter((x) => {
+      const s = String(x?.lastRunStatus || "").toLowerCase();
+      return s.includes("error") || s.includes("fail");
+    });
+    if (badCron.length > 0) {
+      checks.push({
+        category: "cron_failures",
+        level: "warn",
+        summary: `检测到 ${badCron.length} 个 cron 任务异常`,
+        action: "检查 cron list --all --json 并重跑失败任务",
+      });
+    }
+
+    if (checks.length === 0) {
+      return {
+        level: "ok",
+        summary: "运行健康，无失败分类",
+        failures: [],
+      };
+    }
+
+    const hasError = checks.some((x) => x.level === "error");
+    return {
+      level: hasError ? "error" : "warn",
+      summary: hasError ? "存在高优先级故障" : "存在需要处理的告警",
+      failures: checks,
+    };
+  }
+
+  window.renderViewButtons = renderViewButtons;
+  window.renderTargetButtons = renderTargetButtons;
+  window.setSafeHTML = setSafeHTML;
+  window.detectRuntimeHealth = detectRuntimeHealth;
+})();

@@ -1,148 +1,216 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenClaw 配置中心</title>
     <style>
       :root {
-        --bg: #0b1220;
-        --panel: rgba(255, 255, 255, 0.1);
-        --panel-strong: rgba(255, 255, 255, 0.14);
-        --text: #eaf1ff;
-        --muted: #9fb0d2;
-        --accent: #56c2ff;
-        --ok: #37d399;
-        --warn: #fbbf24;
-        --err: #f87171;
-        --border: rgba(255, 255, 255, 0.16);
+        color-scheme: light;
+        --bg: #f3f4ef;
+        --ink: #1e2a2b;
+        --muted: #5b6a6c;
+        --panel: #ffffff;
+        --line: #d9e0dc;
+        --brand: #0f766e;
+        --brand-soft: #d7efe7;
+        --warn: #b45309;
+        --danger: #9f1239;
+        --ok: #166534;
+        --shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
       }
 
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
 
       body {
         margin: 0;
         min-height: 100vh;
-        color: var(--text);
-        font-family: "SF Pro Display", "PingFang SC", "Noto Sans SC", sans-serif;
+        color: var(--ink);
+        font-family: "Space Grotesk", "Noto Sans SC", "PingFang SC", sans-serif;
         background:
-          radial-gradient(80rem 60rem at 10% -10%, #1b3a6f 0%, transparent 55%),
-          radial-gradient(70rem 70rem at 100% 0%, #113f55 0%, transparent 54%),
-          linear-gradient(160deg, #04070d, #0f1628 40%, #0a101f);
+          radial-gradient(circle at 20% 12%, rgba(15, 118, 110, 0.16), transparent 34%),
+          radial-gradient(circle at 82% 18%, rgba(249, 115, 22, 0.18), transparent 30%),
+          linear-gradient(135deg, #f8faf6 0%, #edf3ef 42%, #e6efec 100%);
       }
 
-      .wrap {
-        width: min(1100px, calc(100% - 32px));
-        margin: 24px auto;
+      .shell {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 26px 22px 44px;
+      }
+
+      .hero {
         display: grid;
-        grid-template-columns: 260px 1fr;
+        grid-template-columns: 1.45fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .hero-main,
+      .hero-side {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+      }
+
+      .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+
+      h1 {
+        margin: 12px 0 8px;
+        font-size: clamp(24px, 3vw, 34px);
+        line-height: 1.08;
+      }
+
+      .sub {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .btn {
+        appearance: none;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .btn.primary {
+        background: var(--brand);
+        color: #f9fffd;
+        box-shadow: 0 10px 20px rgba(15, 118, 110, 0.28);
+      }
+
+      .btn.ghost {
+        background: #fff;
+        border-color: var(--line);
+      }
+
+      .btn.alert {
+        background: #fff7ed;
+        border-color: #fed7aa;
+        color: #9a3412;
+      }
+
+      .btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+        transform: none;
+      }
+
+      .meta-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 10px;
+      }
+
+      .meta-list li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 13px;
+        padding-bottom: 8px;
+        border-bottom: 1px dashed var(--line);
+      }
+
+      .meta-list li:last-child {
+        border-bottom: none;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 270px minmax(0, 1fr);
         gap: 16px;
       }
 
-      .glass {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        backdrop-filter: blur(16px);
-      }
-
-      .side {
+      .aside {
         padding: 14px;
         position: sticky;
         top: 16px;
         height: fit-content;
       }
 
-      .side h1 {
-        font-size: 18px;
-        margin: 0 0 8px;
-      }
-
-      .sub {
+      .aside h2 {
+        margin: 0 0 12px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
         color: var(--muted);
-        font-size: 12px;
-        margin-bottom: 12px;
       }
 
-      .steps {
+      #stepsHost {
         display: grid;
         gap: 8px;
       }
 
       .step {
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         border-radius: 12px;
-        padding: 10px;
-        font-size: 13px;
-        color: #c4d6f8;
-        cursor: pointer;
-        background: rgba(255, 255, 255, 0.02);
+        padding: 8px 10px;
+        font-size: 12px;
+        background: #f9fbfa;
       }
 
-      .step.active {
-        border-color: rgba(86, 194, 255, 0.8);
-        background: rgba(86, 194, 255, 0.15);
-        color: #f4f8ff;
+      .step b {
+        display: block;
+        margin-bottom: 2px;
+        font-size: 12px;
       }
 
-      .side .links {
-        margin-top: 14px;
+      .content {
         display: grid;
-        gap: 8px;
+        gap: 14px;
       }
 
-      .main {
+      .card {
         padding: 16px;
       }
 
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 12px;
-      }
-
-      .status {
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        border: 1px solid var(--border);
-        color: var(--muted);
-      }
-
-      .status.ok { color: var(--ok); border-color: rgba(55, 211, 153, 0.6); }
-      .status.warn { color: var(--warn); border-color: rgba(251, 191, 36, 0.6); }
-      .status.err { color: var(--err); border-color: rgba(248, 113, 113, 0.6); }
-
-      .card {
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 14px;
-        background: var(--panel-strong);
-        animation: fadeIn 260ms ease;
-      }
-
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(6px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-
-      h2 {
-        margin: 0 0 6px;
-        font-size: 18px;
-      }
-
-      .hint {
+      .card h3 {
         margin: 0 0 10px;
-        color: var(--muted);
-        font-size: 13px;
+        font-size: 16px;
       }
 
-      .grid {
+      .field-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
       }
 
@@ -151,210 +219,300 @@
         gap: 6px;
       }
 
-      label {
-        font-size: 12px;
-        color: #bfd0ef;
+      .field.full {
+        grid-column: 1 / -1;
       }
 
-      input, select, textarea {
+      .field label {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        letter-spacing: 0.03em;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
         width: 100%;
+        border: 1px solid var(--line);
         border-radius: 10px;
-        border: 1px solid var(--border);
-        background: rgba(8, 14, 26, 0.6);
-        color: var(--text);
-        padding: 10px;
-        font-size: 14px;
-        outline: none;
+        padding: 10px 11px;
+        font: inherit;
+        color: var(--ink);
+        background: #fff;
       }
 
-      input:focus, select:focus, textarea:focus {
-        border-color: rgba(86, 194, 255, 0.8);
-        box-shadow: 0 0 0 2px rgba(86, 194, 255, 0.2);
-      }
-
-      textarea {
-        min-height: 120px;
+      .field textarea {
+        min-height: 106px;
         resize: vertical;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 12px;
       }
 
-      .actions {
-        margin-top: 12px;
+      .hint {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .check {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 12px;
+        background: #fafcfa;
+      }
+
+      .check.bad {
+        border-color: #fecaca;
+        background: #fff1f2;
+      }
+
+      .check.good {
+        border-color: #bbf7d0;
+        background: #f0fdf4;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      .pill.ok {
+        background: #dcfce7;
+        color: var(--ok);
+      }
+
+      .pill.warn {
+        background: #fef3c7;
+        color: var(--warn);
+      }
+
+      .pill.error {
+        background: #ffe4e6;
+        color: var(--danger);
+      }
+
+      pre {
+        margin: 0;
+        background: #0f172a;
+        color: #d1fae5;
+        border-radius: 10px;
+        padding: 12px;
+        max-height: 280px;
+        overflow: auto;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .status-row {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
       }
 
-      button, .btn {
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.06);
-        color: var(--text);
-        padding: 9px 12px;
-        font-size: 13px;
-        text-decoration: none;
-        cursor: pointer;
-      }
-
-      button.primary {
-        border-color: rgba(86, 194, 255, 0.9);
-        background: rgba(86, 194, 255, 0.18);
-      }
-
-      button.ghost {
-        background: transparent;
-      }
-
-      .muted {
+      .tiny {
+        font-size: 12px;
         color: var(--muted);
-        font-size: 12px;
       }
 
-      .split {
-        display: grid;
-        grid-template-columns: 1fr 280px;
-        gap: 10px;
-      }
-
-      .service-list {
-        display: grid;
-        gap: 8px;
-      }
-
-      .svc {
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 8px;
-        font-size: 12px;
-      }
-
-      .banner { padding: 8px 10px; border-radius: 10px; font-size: 12px; text-align: center; margin-bottom: 10px; }
-      .banner.first-time { background: rgba(86, 194, 255, 0.18); border: 1px solid rgba(86, 194, 255, 0.6); color: var(--accent); }
-      .banner.edit-mode { background: rgba(55, 211, 153, 0.12); border: 1px solid rgba(55, 211, 153, 0.4); color: var(--ok); }
-      .banner.auth-temp { background: rgba(251, 191, 36, 0.14); border: 1px solid rgba(251, 191, 36, 0.45); color: var(--warn); }
-
-      @media (max-width: 980px) {
-        .wrap {
+      @media (max-width: 960px) {
+        .hero {
           grid-template-columns: 1fr;
         }
-        .side {
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .aside {
           position: static;
         }
-        .grid,
-        .split {
+
+        .field-grid,
+        .check-grid {
           grid-template-columns: 1fr;
         }
       }
     </style>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   </head>
   <body>
-    <div class="wrap">
-      <aside class="side glass">
-        <h1>配置中心</h1>
-        <div class="sub">只需一次配置，后续可在这里随时改参数并重启服务。</div>
-        <div id="modeBanner"></div>
-        <div id="steps" class="steps"></div>
-        <div class="links">
-          <a class="btn" href="/dashboard/" target="_self">打开驾驶舱</a>
-          <button id="btnReloadStatus" type="button">刷新服务状态</button>
-        </div>
-      </aside>
+    <div id="app" class="shell" v-cloak>
+      <section class="hero">
+        <article class="hero-main">
+          <span class="kicker">OpenClaw Control Center</span>
+          <h1>配置中心</h1>
+          <p class="sub">
+            一次配置，驱动安装、同步、重启与健康检查。保存配置后可直接执行整套 apply 流程。
+          </p>
+          <div class="hero-actions">
+            <button class="btn primary" :disabled="busy" @click="applyConfig">保存并应用</button>
+            <button class="btn ghost" :disabled="busy" @click="saveConfig">仅保存配置</button>
+            <button class="btn alert" :disabled="busy" @click="restartService">重启服务</button>
+            <a class="btn ghost" href="/dashboard/" target="_self">打开驾驶舱</a>
+          </div>
+        </article>
+        <article class="hero-side">
+          <ul class="meta-list">
+            <li><span>配置文件</span><b>{{ envPath }}</b></li>
+            <li><span>当前 Profile</span><b>{{ form.OPENCLAW_PROFILE || '-' }}</b></li>
+            <li><span>鉴权</span><b>{{ authDesc }}</b></li>
+            <li><span>最后刷新</span><b>{{ refreshedAt || '-' }}</b></li>
+          </ul>
+          <p class="tiny" style="margin-top: 8px;">实时轮询：服务状态与预检每 12 秒自动刷新。</p>
+        </article>
+      </section>
 
-      <section class="main glass">
-        <div class="toolbar">
-          <div id="headTitle">加载中...</div>
-          <div id="globalStatus" class="status">未执行</div>
-        </div>
+      <section class="layout">
+        <aside class="panel aside">
+          <h2>操作步骤</h2>
+          <div id="stepsHost"></div>
+          <div id="panel" style="margin-top: 10px;"></div>
+        </aside>
 
-        <div id="panel"></div>
+        <div class="content">
+          <article class="panel card">
+            <h3>基础配置</h3>
+            <div class="field-grid">
+              <div class="field">
+                <label>OPENCLAW_PROFILE</label>
+                <input v-model.trim="form.OPENCLAW_PROFILE" />
+              </div>
+              <div class="field">
+                <label>COMPANY_NAME</label>
+                <input v-model.trim="form.COMPANY_NAME" />
+              </div>
+              <div class="field full">
+                <label>SOURCE_OPENCLAW_CONFIG</label>
+                <input v-model.trim="form.SOURCE_OPENCLAW_CONFIG" />
+              </div>
+              <div class="field full">
+                <label>PROJECT_PATH</label>
+                <input v-model.trim="form.PROJECT_PATH" />
+              </div>
+              <div class="field">
+                <label>PROJECT_REPO</label>
+                <input v-model.trim="form.PROJECT_REPO" />
+              </div>
+              <div class="field">
+                <label>DASHBOARD_PORT</label>
+                <input v-model.trim="form.DASHBOARD_PORT" />
+              </div>
+              <div class="field full">
+                <label>WORKFLOW_TEMPLATE</label>
+                <select v-model="form.WORKFLOW_TEMPLATE">
+                  <option value="default">默认执行流</option>
+                  <option value="requirement-review">需求评审流</option>
+                  <option value="bugfix">Bug 修复流</option>
+                  <option value="release-retro">发布复盘流</option>
+                </select>
+              </div>
+            </div>
+          </article>
 
-        <div class="actions">
-          <button id="btnPrev" type="button" class="ghost">上一步</button>
-          <button id="btnNext" type="button" class="ghost">下一步</button>
-          <button id="btnSave" type="button">保存配置</button>
-          <button id="btnApply" type="button" class="primary">应用并重启服务</button>
-          <button id="btnRestart" type="button">仅重启服务</button>
+          <article class="panel card">
+            <h3>飞书与 GitHub</h3>
+            <div class="field-grid">
+              <div class="field"><label>GROUP_ID</label><input v-model.trim="form.GROUP_ID" /></div>
+              <div class="field"><label>GH_TOKEN</label><input type="password" v-model="form.GH_TOKEN" /></div>
+              <div class="field"><label>FEISHU_AI_ACCOUNT_ID</label><input v-model.trim="form.FEISHU_AI_ACCOUNT_ID" /></div>
+              <div class="field"><label>FEISHU_AI_BOT_NAME</label><input v-model.trim="form.FEISHU_AI_BOT_NAME" /></div>
+              <div class="field"><label>FEISHU_AI_APP_ID</label><input v-model.trim="form.FEISHU_AI_APP_ID" /></div>
+              <div class="field"><label>FEISHU_AI_APP_SECRET</label><input type="password" v-model="form.FEISHU_AI_APP_SECRET" /></div>
+            </div>
+          </article>
+
+          <article class="panel card">
+            <h3>模型与扩展</h3>
+            <div class="field-grid">
+              <div class="field"><label>MODEL_PRIMARY</label><input v-model.trim="form.MODEL_PRIMARY" /></div>
+              <div class="field"><label>MODEL_SUBAGENT</label><input v-model.trim="form.MODEL_SUBAGENT" /></div>
+              <div class="field full"><label>CUSTOM_BASE_URL</label><input v-model.trim="form.CUSTOM_BASE_URL" /></div>
+              <div class="field"><label>CUSTOM_PROVIDER_ID</label><input v-model.trim="form.CUSTOM_PROVIDER_ID" /></div>
+              <div class="field"><label>CUSTOM_MODEL_ID</label><input v-model.trim="form.CUSTOM_MODEL_ID" /></div>
+              <div class="field"><label>CUSTOM_COMPATIBILITY</label><input v-model.trim="form.CUSTOM_COMPATIBILITY" /></div>
+              <div class="field"><label>CUSTOM_API_KEY</label><input type="password" v-model="form.CUSTOM_API_KEY" /></div>
+              <div class="field"><label>DISCORD_GUILD_ID</label><input v-model.trim="form.DISCORD_GUILD_ID" /></div>
+              <div class="field"><label>DISCORD_CHANNEL_ID</label><input v-model.trim="form.DISCORD_CHANNEL_ID" /></div>
+              <div class="field"><label>DISCORD_BOT_TOKEN</label><input type="password" v-model="form.DISCORD_BOT_TOKEN" /></div>
+            </div>
+          </article>
+
+          <article class="panel card">
+            <h3>预检与服务状态</h3>
+            <div class="status-row" style="margin-bottom: 10px;">
+              <span class="pill" :class="preflightPillClass">{{ preflightSummary }}</span>
+              <button class="btn ghost" :disabled="busy" @click="refreshPreflight">刷新预检</button>
+              <button class="btn ghost" :disabled="busy" @click="refreshServiceStatus">刷新服务</button>
+            </div>
+
+            <div class="check-grid" style="margin-bottom: 10px;">
+              <div class="check" :class="c.ok ? 'good' : 'bad'" v-for="c in preflightChecks" :key="c.name">
+                <b>{{ c.name }}</b>
+                <div>{{ c.ok ? 'OK' : 'FAIL' }}</div>
+                <div class="tiny" v-if="c.version">{{ c.version }}</div>
+                <div class="tiny" v-if="c.hint">{{ c.hint }}</div>
+              </div>
+            </div>
+
+            <div class="check-grid">
+              <div class="check" v-for="s in services" :key="s.name" :class="s.running ? 'good' : 'bad'">
+                <b>{{ s.name }}</b>
+                <div>{{ s.running ? 'running' : 'stopped' }}</div>
+                <div class="tiny">pid: {{ s.pid || '-' }}</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel card">
+            <h3>任务执行日志</h3>
+            <div class="status-row" style="margin-bottom: 10px;">
+              <span class="pill" :class="taskPillClass">{{ taskSummary }}</span>
+              <span class="tiny" v-if="task.id">Task ID: {{ task.id }}</span>
+            </div>
+            <pre>{{ taskLogText }}</pre>
+          </article>
         </div>
       </section>
     </div>
 
     <script>
-      const steps = [
-        { id: "step-port", label: "1) 端口与基础" },
-        { id: "step-project", label: "2) 公司与项目" },
-        { id: "step-model", label: "3) 模型与密钥" },
-        { id: "step-feishu", label: "4) 飞书配置" },
-        { id: "step-extra", label: "5) 扩展通道" },
-        { id: "step-run", label: "6) 应用与状态" },
-      ];
-
-      const modelPresets = {
-        keep: null,
-        deepseek: { provider_id: "deepseek", model_id: "deepseek-chat", base_url: "https://api.deepseek.com/v1", compatibility: "openai" },
-        qwen: { provider_id: "qwen", model_id: "qwen-max", base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1", compatibility: "openai" },
-        moonshot: { provider_id: "moonshot", model_id: "moonshot-v1-128k", base_url: "https://api.moonshot.cn/v1", compatibility: "openai" },
-        zai: { provider_id: "zai", model_id: "zai-r1", base_url: "https://open.bigmodel.cn/api/paas/v4", compatibility: "openai" },
-        minimax: { provider_id: "minimax", model_id: "MiniMax-Text-01", base_url: "https://api.minimax.chat/v1", compatibility: "openai" },
-        custom: { provider_id: "", model_id: "", base_url: "", compatibility: "openai" },
-      };
-
-      const state = {
-        stepIdx: 0,
-        config: {},
-        auth: {},
-        taskId: "",
-        taskTimer: null,
-        firstTime: false,
-      };
-
-      function esc(v) {
-        return String(v ?? "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&#39;");
-      }
-
       function byId(id) {
         return document.getElementById(id);
       }
 
-      const BLOCKED_TAGS = new Set(["script", "iframe", "object", "embed", "meta", "base", "link"]);
-      const URL_ATTRS = new Set(["href", "src", "xlink:href", "formaction"]);
-
-      function isSafeUrl(url) {
-        const raw = String(url || "").trim();
-        if (!raw) return true;
-        if (raw.startsWith("#") || raw.startsWith("/") || raw.startsWith("./") || raw.startsWith("../")) return true;
-        try {
-          const parsed = new URL(raw, location.href);
-          return ["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol);
-        } catch (_) {
-          return false;
-        }
-      }
-
       function sanitizeFragment(fragment) {
-        fragment.querySelectorAll("*").forEach((node) => {
-          const tag = node.tagName.toLowerCase();
-          if (BLOCKED_TAGS.has(tag)) {
-            node.remove();
-            return;
+        const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_ELEMENT);
+        const blocked = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META"]);
+        const badAttrs = /^on/i;
+        while (walker.nextNode()) {
+          const el = walker.currentNode;
+          if (blocked.has(el.tagName)) {
+            el.remove();
+            continue;
           }
-          Array.from(node.attributes).forEach((attr) => {
+          for (const attr of [...el.attributes]) {
             const name = attr.name.toLowerCase();
-            const value = attr.value;
-            if (name.startsWith("on") || name === "srcdoc") {
-              node.removeAttribute(attr.name);
-              return;
+            const value = String(attr.value || "");
+            if (badAttrs.test(name)) {
+              el.removeAttribute(attr.name);
+              continue;
             }
-            if (URL_ATTRS.has(name) && !isSafeUrl(value)) {
-              node.removeAttribute(attr.name);
+            if ((name === "href" || name === "src" || name === "xlink:href" || name === "formaction") && /^\s*javascript:/i.test(value)) {
+              el.removeAttribute(attr.name);
             }
-          });
-        });
+          }
+        }
       }
 
       function setSafeHTML(host, html) {
@@ -362,683 +520,253 @@
         const template = document.createElement("template");
         template.innerHTML = String(html || "");
         sanitizeFragment(template.content);
-        host.replaceChildren(template.content);
+        host.replaceChildren();
+        host.appendChild(template.content.cloneNode(true));
       }
 
-      function setStatus(text, kind = "") {
-        const el = byId("globalStatus");
-        el.textContent = text;
-        el.className = `status ${kind}`.trim();
-      }
-
-      function updateStepNav() {
-        const bannerEl = byId("modeBanner");
-        if (bannerEl) {
-          bannerEl.replaceChildren();
-          const modeBanner = document.createElement("div");
-          modeBanner.className = `banner ${state.firstTime ? "first-time" : "edit-mode"}`;
-          modeBanner.textContent = state.firstTime ? "首次配置向导" : "编辑已有配置";
-          bannerEl.appendChild(modeBanner);
-          if (state.auth?.ephemeral) {
-            const authBanner = document.createElement("div");
-            authBanner.className = "banner auth-temp";
-            authBanner.textContent = "当前使用临时控制令牌，服务重启后会变化，建议在 .env 设置 CONTROL_TOKEN。";
-            bannerEl.appendChild(authBanner);
-          }
-        }
-        const stepsHost = byId("steps");
-        if (stepsHost) {
-          stepsHost.replaceChildren();
-          steps.forEach((s, idx) => {
-            const item = document.createElement("div");
-            item.className = `step ${idx === state.stepIdx ? "active" : ""}`.trim();
-            item.dataset.idx = String(idx);
-            item.textContent = s.label;
-            stepsHost.appendChild(item);
-          });
-        }
-        byId("headTitle").textContent = steps[state.stepIdx].label;
-      }
-
-      function getVal(id) {
-        const el = byId(id);
-        return el ? String(el.value || "").trim() : "";
-      }
-
-      function fillValue(id, value) {
-        const el = byId(id);
-        if (el) el.value = value ?? "";
-      }
-
-      function collectForm() {
-        const cfg = { ...state.config };
-        const ids = [
-          "OPENCLAW_PROFILE",
-          "SOURCE_OPENCLAW_CONFIG",
-          "COMPANY_NAME",
-          "PROJECT_PATH",
-          "PROJECT_REPO",
-          "WORKFLOW_TEMPLATE",
-          "GROUP_ID",
-          "FEISHU_HOT_ACCOUNT_ID",
-          "FEISHU_HOT_BOT_NAME",
-          "FEISHU_HOT_APP_ID",
-          "FEISHU_HOT_APP_SECRET",
-          "FEISHU_AI_ACCOUNT_ID",
-          "FEISHU_AI_BOT_NAME",
-          "FEISHU_AI_APP_ID",
-          "FEISHU_AI_APP_SECRET",
-          "GH_TOKEN",
-          "MODEL_PRIMARY",
-          "DASHBOARD_PORT",
-          "CUSTOM_BASE_URL",
-          "CUSTOM_API_KEY",
-          "CUSTOM_MODEL_ID",
-          "CUSTOM_PROVIDER_ID",
-          "CUSTOM_COMPATIBILITY",
-          "MODEL_SUBAGENT",
-          "DISCORD_BOT_TOKEN",
-          "DISCORD_GUILD_ID",
-          "DISCORD_CHANNEL_ID",
+      function renderStepRail() {
+        const stepsHost = byId("stepsHost");
+        if (!stepsHost) return;
+        const steps = [
+          { title: "01 配置参数", tip: "填写项目、群组、模型与凭据" },
+          { title: "02 预检环境", tip: "确认命令依赖、鉴权、Profile" },
+          { title: "03 保存配置", tip: "写入 .env，保留额外字段" },
+          { title: "04 执行应用", tip: "stop → onboard → install → start → healthcheck" },
+          { title: "05 进入驾驶舱", tip: "按角色视角持续跟踪" },
         ];
-        ids.forEach((k) => {
-          const v = byId(k);
-          if (v) cfg[k] = String(v.value || "").trim();
-        });
-
-        const preset = getVal("MODEL_PRESET");
-        if (preset !== "keep") {
-          const pid = cfg.CUSTOM_PROVIDER_ID || "";
-          const mid = cfg.CUSTOM_MODEL_ID || "";
-          if (pid && mid) cfg.MODEL_PRIMARY = `${pid}/${mid}`;
+        stepsHost.replaceChildren();
+        for (const step of steps) {
+          const item = document.createElement("article");
+          item.className = "step";
+          const b = document.createElement("b");
+          b.textContent = step.title;
+          const p = document.createElement("span");
+          p.textContent = step.tip;
+          item.appendChild(b);
+          item.appendChild(p);
+          stepsHost.appendChild(item);
         }
-
-        return cfg;
       }
 
-      function validateCore(cfg) {
-        const miss = [];
-        if (!cfg.GROUP_ID) miss.push("GROUP_ID");
-        if (!cfg.FEISHU_AI_APP_ID) miss.push("FEISHU_AI_APP_ID");
-        if (!cfg.FEISHU_AI_APP_SECRET) miss.push("FEISHU_AI_APP_SECRET");
-        if (!/^\d+$/.test(cfg.DASHBOARD_PORT || "")) miss.push("DASHBOARD_PORT");
-        return miss;
-      }
-
-      function renderPanel() {
-        const c = state.config;
-
+      function renderPanel(key) {
         const panes = {
-          "step-port": `
-            <article class="card">
-              <h2>端口与基础配置</h2>
-              <p class="hint">启动脚本只问这一个端口。后续你也可以在这里改并重新应用。</p>
-              <div class="grid">
-                <div class="field">
-                  <label>服务端口 (DASHBOARD_PORT)</label>
-                  <input id="DASHBOARD_PORT" inputmode="numeric" value="${esc(c.DASHBOARD_PORT || "8788")}" />
-                </div>
-                <div class="field">
-                  <label>OpenClaw Profile</label>
-                  <input id="OPENCLAW_PROFILE" value="${esc(c.OPENCLAW_PROFILE || "company")}" />
-                </div>
-                <div class="field" style="grid-column:1 / -1;">
-                  <label>SOURCE_OPENCLAW_CONFIG (可选)</label>
-                  <input id="SOURCE_OPENCLAW_CONFIG" value="${esc(c.SOURCE_OPENCLAW_CONFIG || "~/.openclaw/openclaw.json")}" />
-                  <div class="muted">若本机已有 OpenClaw 配置，可指定来源；为空时走默认配置文件。</div>
-                </div>
-              </div>
-            </article>
-          `,
-
-          "step-project": `
-            <article class="card">
-              <h2>公司与项目</h2>
-              <p class="hint">这些字段会用于群提示词、驾驶舱展示和脚本自动生成。</p>
-              <div class="grid">
-                <div class="field">
-                  <label>COMPANY_NAME</label>
-                  <input id="COMPANY_NAME" value="${esc(c.COMPANY_NAME || "OpenClaw Company")}" />
-                </div>
-                <div class="field">
-                  <label>PROJECT_REPO</label>
-                  <input id="PROJECT_REPO" value="${esc(c.PROJECT_REPO || "your-org/your-repo")}" />
-                </div>
-                <div class="field">
-                  <label>流程模板包 (WORKFLOW_TEMPLATE)</label>
-                  <select id="WORKFLOW_TEMPLATE">
-                    <option value="default" ${(c.WORKFLOW_TEMPLATE || "default") === "default" ? "selected" : ""}>默认综合流</option>
-                    <option value="requirement-review" ${(c.WORKFLOW_TEMPLATE || "default") === "requirement-review" ? "selected" : ""}>需求评审流</option>
-                    <option value="bugfix" ${(c.WORKFLOW_TEMPLATE || "default") === "bugfix" ? "selected" : ""}>Bug 修复流</option>
-                    <option value="release-retro" ${(c.WORKFLOW_TEMPLATE || "default") === "release-retro" ? "selected" : ""}>发布复盘流</option>
-                  </select>
-                  <div class="muted">会影响 cron 模板任务与群系统提示词，可随时切换后一键应用。</div>
-                </div>
-                <div class="field" style="grid-column:1 / -1;">
-                  <label>PROJECT_PATH</label>
-                  <input id="PROJECT_PATH" value="${esc(c.PROJECT_PATH || "/path/to/your-project")}" />
-                </div>
-                <div class="field" style="grid-column:1 / -1;">
-                  <label>GROUP_ID (必填)</label>
-                  <input id="GROUP_ID" value="${esc(c.GROUP_ID || "")}" placeholder="oc_xxxxxxxxxxxxx" />
-                </div>
-              </div>
-            </article>
-          `,
-
-          "step-model": `
-            <article class="card">
-              <h2>模型与密钥</h2>
-              <p class="hint">支持国内模型预设，也支持自定义模型（provider/model）。</p>
-              <div class="grid">
-                <div class="field">
-                  <label>模型预设</label>
-                  <select id="MODEL_PRESET">
-                    <option value="keep">保持现状（不覆盖）</option>
-                    <option value="deepseek">DeepSeek</option>
-                    <option value="qwen">Qwen / DashScope</option>
-                    <option value="moonshot">Moonshot (Kimi)</option>
-                    <option value="zai">ZAI (GLM)</option>
-                    <option value="minimax">MiniMax</option>
-                    <option value="custom">自定义</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label>MODEL_PRIMARY（自动生成）</label>
-                  <input id="MODEL_PRIMARY" value="${esc(c.MODEL_PRIMARY || "")}" placeholder="如 deepseek/deepseek-chat" readonly />
-                </div>
-              </div>
-              <div id="customProviderFields" style="display:none; margin-top:10px;">
-                <div class="grid">
-                  <div class="field">
-                    <label>API Base URL</label>
-                    <input id="CUSTOM_BASE_URL" type="text" value="${esc(c.CUSTOM_BASE_URL || "")}" placeholder="https://api.example.com/v1" />
-                  </div>
-                  <div class="field">
-                    <label>API Key</label>
-                    <input id="CUSTOM_API_KEY" type="password" value="${esc(c.CUSTOM_API_KEY || "")}" placeholder="sk-..." />
-                  </div>
-                  <div class="field">
-                    <label>模型 ID</label>
-                    <input id="CUSTOM_MODEL_ID" type="text" value="${esc(c.CUSTOM_MODEL_ID || "")}" placeholder="model-name" />
-                  </div>
-                  <div class="field">
-                    <label>Provider ID</label>
-                    <input id="CUSTOM_PROVIDER_ID" type="text" value="${esc(c.CUSTOM_PROVIDER_ID || "")}" placeholder="my-provider" />
-                  </div>
-                  <div class="field">
-                    <label>兼容模式</label>
-                    <select id="CUSTOM_COMPATIBILITY">
-                      <option value="openai">openai</option>
-                      <option value="anthropic">anthropic</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div class="grid" style="margin-top:10px;">
-                <div class="field" style="grid-column:1 / -1;">
-                  <label>GH_TOKEN (可选，GitHub Issue 同步建议配置)</label>
-                  <input id="GH_TOKEN" type="password" value="${esc(c.GH_TOKEN || "")}" />
-                </div>
-              </div>
-            </article>
-          `,
-
-          "step-feishu": `
-            <article class="card">
-              <h2>飞书账号映射</h2>
-              <p class="hint">默认单机器人：ai-tech 负责群路由与情报能力。hot-search 字段仅兼容旧配置，可留空。</p>
-              <div class="grid">
-                <div class="field">
-                  <label>FEISHU_HOT_ACCOUNT_ID (兼容旧配置，可选)</label>
-                  <input id="FEISHU_HOT_ACCOUNT_ID" value="${esc(c.FEISHU_HOT_ACCOUNT_ID || "")}" />
-                </div>
-                <div class="field">
-                  <label>FEISHU_HOT_BOT_NAME (兼容旧配置，可选)</label>
-                  <input id="FEISHU_HOT_BOT_NAME" value="${esc(c.FEISHU_HOT_BOT_NAME || "")}" />
-                </div>
-                <div class="field">
-                  <label>FEISHU_HOT_APP_ID (兼容旧配置，可选)</label>
-                  <input id="FEISHU_HOT_APP_ID" value="${esc(c.FEISHU_HOT_APP_ID || "")}" />
-                </div>
-                <div class="field">
-                  <label>FEISHU_HOT_APP_SECRET (兼容旧配置，可选)</label>
-                  <input id="FEISHU_HOT_APP_SECRET" type="password" value="${esc(c.FEISHU_HOT_APP_SECRET || "")}" />
-                </div>
-                <div class="field">
-                  <label>FEISHU_AI_ACCOUNT_ID (必填)</label>
-                  <input id="FEISHU_AI_ACCOUNT_ID" value="${esc(c.FEISHU_AI_ACCOUNT_ID || "ai-tech")}" />
-                </div>
-                <div class="field">
-                  <label>FEISHU_AI_BOT_NAME (必填)</label>
-                  <input id="FEISHU_AI_BOT_NAME" value="${esc(c.FEISHU_AI_BOT_NAME || "小龙虾 2 号")}" />
-                </div>
-                <div class="field">
-                  <label>FEISHU_AI_APP_ID (必填)</label>
-                  <input id="FEISHU_AI_APP_ID" value="${esc(c.FEISHU_AI_APP_ID || "")}" />
-                </div>
-                <div class="field">
-                  <label>FEISHU_AI_APP_SECRET (必填)</label>
-                  <input id="FEISHU_AI_APP_SECRET" type="password" value="${esc(c.FEISHU_AI_APP_SECRET || "")}" />
-                </div>
-              </div>
-            </article>
-          `,
-
-          "step-extra": `
-            <article class="card">
-              <h2>扩展通道与子代理</h2>
-              <p class="hint">Discord 通道为可选项，填写后自动启用。子代理模型可用低成本模型节省 40-60% token。</p>
-              <div class="grid">
-                <div class="field" style="grid-column:1 / -1;">
-                  <label>MODEL_SUBAGENT (可选，委派子任务用的低成本模型)</label>
-                  <input id="MODEL_SUBAGENT" value="${esc(c.MODEL_SUBAGENT || "")}" placeholder="如 claude-3-haiku / deepseek-chat" />
-                </div>
-              </div>
-              <h3 style="margin-top:18px;">Discord 通道（可选）</h3>
-              <p class="muted">需在 <a href="https://discord.com/developers/applications" target="_blank" style="color:var(--accent);">Discord Developer Portal</a> 创建 Bot，开启 Message Content Intent 和 Server Members Intent。</p>
-              <div class="grid">
-                <div class="field" style="grid-column:1 / -1;">
-                  <label>DISCORD_BOT_TOKEN</label>
-                  <input id="DISCORD_BOT_TOKEN" type="password" value="${esc(c.DISCORD_BOT_TOKEN || "")}" placeholder="Bot Token" />
-                </div>
-                <div class="field">
-                  <label>DISCORD_GUILD_ID (服务器 ID)</label>
-                  <input id="DISCORD_GUILD_ID" value="${esc(c.DISCORD_GUILD_ID || "")}" placeholder="右键服务器 → 复制 ID" />
-                </div>
-                <div class="field">
-                  <label>DISCORD_CHANNEL_ID (频道 ID)</label>
-                  <input id="DISCORD_CHANNEL_ID" value="${esc(c.DISCORD_CHANNEL_ID || "")}" placeholder="右键频道 → 复制 ID" />
-                </div>
-              </div>
-            </article>
-          `,
-
-          "step-run": `
-            <article class="card split">
-              <div>
-                <h2>应用配置并重启</h2>
-                <div id="preflightResult" class="muted" style="margin-bottom:8px;">正在检测环境...</div>
-                <p class="hint">点击“${state.firstTime ? "初始化并启动" : "应用并重启服务"}”后，会自动执行：<code>${state.firstTime ? "onboard → install → start → healthcheck" : "stop → install → start → healthcheck"}</code>。</p>
-                <div id="taskTips" class="muted">等待操作...</div>
-                <div style="margin-top:8px;">
-                  <label>任务日志</label>
-                  <textarea id="taskLog" readonly></textarea>
-                </div>
-              </div>
-              <div>
-                <h2>服务状态</h2>
-                <div id="serviceList" class="service-list"></div>
-              </div>
-            </article>
-          `,
+          overview:
+            "<div class=\"tiny\">配置中心会在保存/应用时调用 <code>/api/config/save</code> 与 <code>/api/config/apply</code>，日志实时轮询。</div>",
+          safety:
+            "<div class=\"tiny\">前端渲染已做 HTML 清洗，禁止脚本注入；后端 API 仍受 token 保护。</div>",
         };
-
-        const key = steps[state.stepIdx].id;
         setSafeHTML(byId("panel"), panes[key] || "");
-
-        if (key === "step-model") {
-          const customFields = byId("customProviderFields");
-          const primaryEl = byId("MODEL_PRIMARY");
-
-          function applyPreset(p) {
-            const data = modelPresets[p];
-            if (p === "keep") {
-              customFields.style.display = "none";
-              primaryEl.readOnly = false;
-              return;
-            }
-            customFields.style.display = "";
-            primaryEl.readOnly = true;
-            const isCustom = p === "custom";
-            const fields = ["CUSTOM_BASE_URL", "CUSTOM_MODEL_ID", "CUSTOM_PROVIDER_ID"];
-            if (isCustom) {
-              fields.forEach(f => { const el = byId(f); if (el) { el.value = ""; el.readOnly = false; } });
-              const compEl = byId("CUSTOM_COMPATIBILITY");
-              if (compEl) { compEl.value = "openai"; compEl.disabled = false; }
-              const keyEl = byId("CUSTOM_API_KEY");
-              if (keyEl) { keyEl.value = ""; keyEl.readOnly = false; }
-              fillValue("MODEL_PRIMARY", "");
-            } else if (data) {
-              fillValue("CUSTOM_BASE_URL", data.base_url);
-              fillValue("CUSTOM_MODEL_ID", data.model_id);
-              fillValue("CUSTOM_PROVIDER_ID", data.provider_id);
-              fillValue("CUSTOM_COMPATIBILITY", data.compatibility);
-              fields.forEach(f => { const el = byId(f); if (el) el.readOnly = true; });
-              const compEl = byId("CUSTOM_COMPATIBILITY");
-              if (compEl) compEl.disabled = true;
-              const keyEl = byId("CUSTOM_API_KEY");
-              if (keyEl) keyEl.readOnly = false;
-              fillValue("MODEL_PRIMARY", `${data.provider_id}/${data.model_id}`);
-            }
-          }
-
-          const savedUrl = String(c.CUSTOM_BASE_URL || "").trim();
-          if (savedUrl) {
-            const matched = Object.entries(modelPresets).find(([k, v]) =>
-              k !== "keep" && k !== "custom" && v &&
-              v.base_url === savedUrl &&
-              v.model_id === String(c.CUSTOM_MODEL_ID || "").trim() &&
-              v.provider_id === String(c.CUSTOM_PROVIDER_ID || "").trim()
-            );
-            const presetKey = matched ? matched[0] : "custom";
-            fillValue("MODEL_PRESET", presetKey);
-            applyPreset(presetKey);
-            if (presetKey === "custom") {
-              fillValue("CUSTOM_BASE_URL", c.CUSTOM_BASE_URL || "");
-              fillValue("CUSTOM_MODEL_ID", c.CUSTOM_MODEL_ID || "");
-              fillValue("CUSTOM_PROVIDER_ID", c.CUSTOM_PROVIDER_ID || "");
-              fillValue("CUSTOM_COMPATIBILITY", c.CUSTOM_COMPATIBILITY || "openai");
-              fillValue("CUSTOM_API_KEY", c.CUSTOM_API_KEY || "");
-            } else {
-              fillValue("CUSTOM_API_KEY", c.CUSTOM_API_KEY || "");
-            }
-          } else {
-            const current = String(c.MODEL_PRIMARY || "").trim();
-            if (current) {
-              fillValue("MODEL_PRESET", "custom");
-              applyPreset("custom");
-              fillValue("MODEL_PRIMARY", current);
-            } else {
-              fillValue("MODEL_PRESET", "keep");
-              applyPreset("keep");
-            }
-          }
-
-          byId("MODEL_PRESET").addEventListener("change", () => {
-            applyPreset(getVal("MODEL_PRESET"));
-          });
-        }
-
-        if (key === "step-run") {
-          refreshServiceStatus();
-          if (state.taskId) {
-            api(`/api/task/${state.taskId}`).then(data => {
-              const task = data.task || {};
-              const logs = Array.isArray(task.logs) ? task.logs : [];
-              const logEl = byId("taskLog");
-              const tipsEl = byId("taskTips");
-              if (logEl) { logEl.value = logs.join("\n"); logEl.scrollTop = logEl.scrollHeight; }
-              if (tipsEl) tipsEl.textContent = `任务 ${task.id || "-"} 状态: ${task.status || "-"}`;
-              if (task.status === "running") pollTask();
-            }).catch(() => {});
-          }
-          api("/api/preflight").then(pf => {
-            const el = byId("preflightResult");
-            if (!el) return;
-            const checks = pf.checks || [];
-            const fragment = document.createDocumentFragment();
-            checks.forEach((c, idx) => {
-              if (idx > 0) fragment.appendChild(document.createTextNode(" \u00A0 "));
-              const isWarn = !c.ok && c.blocking === false;
-              const icon = document.createElement("span");
-              icon.style.color = c.ok ? "var(--ok)" : isWarn ? "var(--warn)" : "var(--err)";
-              icon.textContent = c.ok ? "✓" : isWarn ? "⚠" : "✗";
-              const ver = c.version ? ` (${String(c.version)})` : "";
-              const hint = isWarn ? " (初始化时自动创建)" : "";
-              fragment.appendChild(icon);
-              fragment.appendChild(document.createTextNode(` ${String(c.name || "-")}${ver}${hint}`));
-            });
-            if (checks.length === 0) {
-              fragment.appendChild(document.createTextNode("未返回预检项"));
-            }
-            el.replaceChildren(fragment);
-          }).catch(() => {
-            const el = byId("preflightResult");
-            if (el) el.textContent = "环境检测失败";
-          });
-        }
-
-        const applyBtn = byId("btnApply");
-        if (applyBtn) {
-          applyBtn.textContent = state.firstTime ? "初始化并启动" : "应用并重启服务";
-        }
       }
 
-      function readCookie(name) {
-        const key = `${name}=`;
-        const rows = document.cookie ? document.cookie.split(";") : [];
-        for (const row of rows) {
-          const v = row.trim();
-          if (v.startsWith(key)) {
+      const { createApp, reactive, computed, onMounted, onUnmounted } = Vue;
+
+      createApp({
+        setup() {
+          const state = reactive({
+            form: {
+              OPENCLAW_PROFILE: "company",
+              SOURCE_OPENCLAW_CONFIG: "~/.openclaw/openclaw.json",
+              COMPANY_NAME: "OpenClaw Company",
+              PROJECT_PATH: "/path/to/your-project",
+              PROJECT_REPO: "your-org/your-repo",
+              WORKFLOW_TEMPLATE: "default",
+              GROUP_ID: "",
+              FEISHU_HOT_ACCOUNT_ID: "",
+              FEISHU_HOT_BOT_NAME: "",
+              FEISHU_HOT_APP_ID: "",
+              FEISHU_HOT_APP_SECRET: "",
+              FEISHU_AI_ACCOUNT_ID: "ai-tech",
+              FEISHU_AI_BOT_NAME: "小龙虾 2 号",
+              FEISHU_AI_APP_ID: "",
+              FEISHU_AI_APP_SECRET: "",
+              GH_TOKEN: "",
+              MODEL_PRIMARY: "",
+              CUSTOM_BASE_URL: "",
+              CUSTOM_API_KEY: "",
+              CUSTOM_MODEL_ID: "",
+              CUSTOM_PROVIDER_ID: "",
+              CUSTOM_COMPATIBILITY: "",
+              DASHBOARD_PORT: "8788",
+              MODEL_SUBAGENT: "",
+              DISCORD_BOT_TOKEN: "",
+              DISCORD_GUILD_ID: "",
+              DISCORD_CHANNEL_ID: "",
+            },
+            envPath: ".env",
+            refreshedAt: "",
+            busy: false,
+            task: { id: "", status: "idle", logs: [] },
+            preflightChecks: [],
+            preflightAllPassed: false,
+            services: [],
+            auth: { enabled: true, ephemeral: false },
+            taskTimer: null,
+            heartbeatTimer: null,
+          });
+
+          const preflightSummary = computed(() => {
+            if (!state.preflightChecks.length) return "尚未执行预检";
+            return state.preflightAllPassed ? "预检通过" : "预检存在阻塞项";
+          });
+
+          const preflightPillClass = computed(() => {
+            if (!state.preflightChecks.length) return "warn";
+            return state.preflightAllPassed ? "ok" : "error";
+          });
+
+          const taskSummary = computed(() => {
+            if (!state.task.id) return "当前无任务";
+            if (state.task.status === "running") return "任务执行中";
+            if (state.task.status === "success") return "任务执行成功";
+            if (state.task.status === "failed") return "任务执行失败";
+            return "任务状态未知";
+          });
+
+          const taskPillClass = computed(() => {
+            if (!state.task.id) return "warn";
+            if (state.task.status === "success") return "ok";
+            if (state.task.status === "failed") return "error";
+            return "warn";
+          });
+
+          const taskLogText = computed(() => {
+            return (state.task.logs || []).join("\n") || "暂无日志";
+          });
+
+          const authDesc = computed(() => {
+            if (!state.auth.enabled) return "未启用";
+            return state.auth.ephemeral ? "启用（临时 token）" : "启用（固定 token）";
+          });
+
+          async function api(path, options = {}) {
+            const init = { method: options.method || "GET", headers: {} };
+            if (options.body !== undefined) {
+              init.headers["content-type"] = "application/json";
+              init.body = JSON.stringify(options.body);
+            }
+            const resp = await fetch(path, init);
+            const payload = await resp.json().catch(() => ({}));
+            if (!resp.ok || payload.ok === false) {
+              throw new Error(payload.error || `请求失败: ${resp.status}`);
+            }
+            return payload;
+          }
+
+          function setForm(next) {
+            for (const key of Object.keys(state.form)) {
+              if (Object.prototype.hasOwnProperty.call(next, key)) {
+                state.form[key] = String(next[key] ?? "");
+              }
+            }
+          }
+
+          async function loadConfig() {
+            const data = await api("/api/config");
+            setForm(data.config || {});
+            state.envPath = `${data.server?.rootDir || ""}/.env`;
+            state.auth = data.auth || state.auth;
+            state.services = data.service?.services || [];
+            state.refreshedAt = new Date().toLocaleTimeString();
+          }
+
+          async function refreshPreflight() {
+            const pf = await api("/api/preflight");
+            state.preflightChecks = pf.checks || [];
+            state.preflightAllPassed = !!pf.allPassed;
+            state.refreshedAt = new Date().toLocaleTimeString();
+          }
+
+          async function refreshServiceStatus() {
+            const svc = await api("/api/service/status");
+            state.services = svc.service?.services || [];
+            state.refreshedAt = new Date().toLocaleTimeString();
+          }
+
+          async function saveConfig() {
+            state.busy = true;
             try {
-              return decodeURIComponent(v.slice(key.length));
-            } catch (_) {
-              return v.slice(key.length);
+              const res = await api("/api/config/save", { method: "POST", body: { config: state.form } });
+              setForm(res.config || {});
+            } finally {
+              state.busy = false;
             }
           }
-        }
-        return "";
-      }
 
-      async function api(path, opts = {}) {
-        const headers = { "content-type": "application/json" };
-        const cookieName = state.auth?.cookieName || "openclaw_control_token";
-        const token = readCookie(cookieName);
-        if (token) headers.authorization = `Bearer ${token}`;
-
-        const res = await fetch(path, {
-          method: opts.method || "GET",
-          headers,
-          credentials: "same-origin",
-          body: opts.body ? JSON.stringify(opts.body) : undefined,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.ok === false) {
-          throw new Error(data.error || `HTTP ${res.status}`);
-        }
-        return data;
-      }
-
-      async function loadConfig() {
-        const data = await api("/api/config");
-        state.config = data.config || {};
-        state.auth = data.auth || {};
-        state.firstTime = data.firstTime ?? false;
-        updateStepNav();
-        setStatus(state.auth?.ephemeral ? "配置已加载（临时控制令牌）" : "配置已加载", state.auth?.ephemeral ? "warn" : "ok");
-      }
-
-      async function saveConfig() {
-        const cfg = collectForm();
-        try {
-          await api("/api/config/save", { method: "POST", body: { config: cfg } });
-          state.config = cfg;
-          const miss = validateCore(cfg);
-          if (miss.length > 0) {
-            setStatus(`已保存（还需填写: ${miss.join(", ")}）`, "warn");
-          } else {
-            setStatus("已保存 .env", "ok");
-          }
-        } catch (err) {
-          setStatus(`保存失败: ${err.message}`, "err");
-        }
-      }
-
-      async function startTask(path, body) {
-        const data = await api(path, { method: "POST", body });
-        state.taskId = data.taskId;
-        setStatus(`任务启动: ${state.taskId}`, "warn");
-        const runIdx = steps.findIndex(s => s.id === "step-run");
-        if (runIdx >= 0 && state.stepIdx !== runIdx) {
-          state.stepIdx = runIdx;
-          updateStepNav();
-          renderPanel();
-        }
-        pollTask();
-      }
-
-      async function runApply() {
-        const cfg = collectForm();
-        const miss = validateCore(cfg);
-        if (miss.length > 0) {
-          setStatus(`缺少必填: ${miss.join(", ")}`, "err");
-          return;
-        }
-
-        try {
-          const pf = await api("/api/preflight");
-          if (!pf.allPassed) {
-            const failed = (pf.checks || []).filter(c => !c.ok && c.blocking !== false).map(c => c.name);
-            if (failed.length > 0) {
-              setStatus(`环境检测未通过: ${failed.join(", ")}`, "err");
-              return;
+          async function startTask(path, body) {
+            state.busy = true;
+            try {
+              const res = await api(path, { method: "POST", body });
+              state.task = { id: res.taskId || "", status: "running", logs: [] };
+              pollTask(true);
+            } finally {
+              state.busy = false;
             }
           }
-        } catch (err) {
-          setStatus(`预检失败: ${err.message}`, "err");
-          return;
-        }
 
-        state.config = cfg;
-        await startTask("/api/config/apply", { config: cfg });
-      }
+          async function applyConfig() {
+            await startTask("/api/config/apply", { config: state.form });
+          }
 
-      async function runRestart() {
-        await startTask("/api/service/restart", {});
-      }
+          async function restartService() {
+            await startTask("/api/service/restart", {});
+          }
 
-      async function pollTask() {
-        if (!state.taskId) return;
-        if (state.taskTimer) clearInterval(state.taskTimer);
-
-        const run = async () => {
-          try {
-            const data = await api(`/api/task/${state.taskId}`);
+          async function pollTask(startLoop = false) {
+            if (!state.task.id) return;
+            const data = await api(`/api/task/${state.task.id}`);
             const task = data.task || {};
-            const logs = Array.isArray(task.logs) ? task.logs : [];
-            const logEl = byId("taskLog");
-            const tipsEl = byId("taskTips");
-            if (logEl) {
-              logEl.value = logs.join("\n");
-              logEl.scrollTop = logEl.scrollHeight;
-            }
-            if (tipsEl) {
-              tipsEl.textContent = `任务 ${task.id || "-"} 状态: ${task.status || "-"}，开始: ${task.startedAt || "-"}`;
-            }
+            state.task.status = task.status || "unknown";
+            state.task.logs = task.logs || [];
 
             if (task.status === "running") {
-              setStatus(`执行中: ${task.name || state.taskId}`, "warn");
-            } else if (task.status === "success") {
-              setStatus("任务完成", "ok");
-              clearInterval(state.taskTimer);
-              state.taskTimer = null;
-              refreshServiceStatus();
-            } else if (task.status === "failed") {
-              setStatus("任务失败，请看日志", "err");
-              clearInterval(state.taskTimer);
-              state.taskTimer = null;
-              refreshServiceStatus();
+              if (!state.taskTimer && startLoop) {
+                state.taskTimer = setInterval(() => {
+                  pollTask().catch((err) => {
+                    state.task.logs.push(`[ERROR] ${err.message}`);
+                  });
+                }, 2000);
+              }
+              return;
             }
-          } catch (err) {
-            setStatus(`拉取任务失败: ${err.message}`, "err");
+
+            if (state.taskTimer) {
+              clearInterval(state.taskTimer);
+              state.taskTimer = null;
+            }
+            await Promise.all([refreshServiceStatus(), refreshPreflight()]);
           }
-        };
 
-        await run();
-        state.taskTimer = setInterval(run, 1500);
-      }
-
-      async function refreshServiceStatus() {
-        try {
-          const data = await api("/api/service/status");
-          const items = data.service?.services || [];
-          const host = byId("serviceList");
-          if (!host) return;
-          host.replaceChildren();
-          items.forEach((s) => {
-            const row = document.createElement("div");
-            row.className = "svc";
-            const header = document.createElement("div");
-            const nameEl = document.createElement("b");
-            nameEl.textContent = String(s.name || "-");
-            const statusEl = document.createElement("span");
-            statusEl.className = `status ${s.running ? "ok" : "err"}`;
-            statusEl.textContent = s.running ? "running" : "stopped";
-            header.appendChild(nameEl);
-            header.appendChild(document.createTextNode(" "));
-            header.appendChild(statusEl);
-            const meta = document.createElement("div");
-            meta.className = "muted";
-            meta.textContent = s.pid ? `PID ${s.pid}` : "PID -";
-            row.appendChild(header);
-            row.appendChild(meta);
-            host.appendChild(row);
+          onMounted(async () => {
+            renderStepRail();
+            renderPanel("overview");
+            await Promise.all([loadConfig(), refreshPreflight(), refreshServiceStatus()]);
+            state.heartbeatTimer = setInterval(() => {
+              Promise.all([refreshPreflight(), refreshServiceStatus()]).catch(() => {});
+            }, 12000);
           });
-        } catch (err) {
-          const host = byId("serviceList");
-          if (host) {
-            host.replaceChildren();
-            const row = document.createElement("div");
-            row.className = "svc";
-            row.textContent = `读取失败: ${String(err.message || err)}`;
-            host.appendChild(row);
-          }
-        }
-      }
 
-      function bindEvents() {
-        byId("steps").addEventListener("click", (e) => {
-          const target = e.target.closest(".step");
-          if (!target) return;
-          const idx = Number(target.dataset.idx);
-          if (!Number.isFinite(idx)) return;
-          state.stepIdx = idx;
-          updateStepNav();
-          renderPanel();
-        });
+          onUnmounted(() => {
+            if (state.taskTimer) clearInterval(state.taskTimer);
+            if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
+          });
 
-        byId("btnPrev").addEventListener("click", () => {
-          state.stepIdx = Math.max(0, state.stepIdx - 1);
-          updateStepNav();
-          renderPanel();
-        });
-
-        byId("btnNext").addEventListener("click", () => {
-          state.stepIdx = Math.min(steps.length - 1, state.stepIdx + 1);
-          updateStepNav();
-          renderPanel();
-        });
-
-        byId("btnSave").addEventListener("click", async () => {
-          try {
-            await saveConfig();
-          } catch (err) {
-            setStatus(`保存失败: ${err.message}`, "err");
-          }
-        });
-
-        byId("btnApply").addEventListener("click", async () => {
-          try {
-            await runApply();
-          } catch (err) {
-            setStatus(`应用失败: ${err.message}`, "err");
-          }
-        });
-
-        byId("btnRestart").addEventListener("click", async () => {
-          try {
-            await runRestart();
-          } catch (err) {
-            setStatus(`重启失败: ${err.message}`, "err");
-          }
-        });
-
-        byId("btnReloadStatus").addEventListener("click", refreshServiceStatus);
-      }
-
-      async function init() {
-        updateStepNav();
-        bindEvents();
-        try {
-          await loadConfig();
-        } catch (err) {
-          setStatus(`加载失败: ${err.message}`, "err");
-        }
-        renderPanel();
-      }
-
-      init();
+          return {
+            ...Vue.toRefs(state),
+            preflightSummary,
+            preflightPillClass,
+            taskSummary,
+            taskPillClass,
+            taskLogText,
+            authDesc,
+            loadConfig,
+            refreshPreflight,
+            refreshServiceStatus,
+            saveConfig,
+            applyConfig,
+            restartService,
+          };
+        },
+      }).mount("#app");
     </script>
   </body>
 </html>
