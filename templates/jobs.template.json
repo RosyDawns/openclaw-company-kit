@@ -3,6 +3,7 @@
     {
       "name": "项目情报雷达",
       "agent": "ai-tech",
+      "subAgentOf": "rd-company",
       "cron": "0 * * * *",
       "tz": "Asia/Shanghai",
       "account": "__HOT_ACCOUNT__",

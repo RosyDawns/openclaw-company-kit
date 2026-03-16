@@ -1,0 +1,10 @@
+{
+  "name": "role-product",
+  "displayName": "产品经理",
+  "layer": "executor",
+  "capabilities": ["requirement-analysis", "issue-management", "user-story"],
+  "reviewScope": [],
+  "wipLimit": 2,
+  "dependencies": [],
+  "cronJobs": ["角色进度同步-产品经理"]
+}

@@ -2,15 +2,17 @@
 
 可发布、可安装、可演示的 OpenClaw 多智能体公司模板仓库。
 
-一条命令完成安装，Web 配置中心按步填写，9 个智能体自动协同运转。
+一条命令完成安装，Web 配置中心按步填写，9 个智能体自动协同运转。内置编排引擎支持任务状态机流转、审核关卡和 3 层角色架构（路由→审核→执行）。
 
 ## Features
 
 ### 核心能力
 - **9 角色智能体** — 总监 / 产品 / 技术总监 / 高级程序员 / Code Reviewer / 测试 / 增长 + 热搜 / AI 科技
+- **3 层角色架构** — 路由层(Dispatcher) → 审核层(Reviewer) → 执行层(Executor)
+- **编排引擎** — 任务状态机 + 审核关卡 + 流转编排器 + 角色分派
 - **飞书群路由** + 13 条角色 cron 调度（晨会 / 午间同步 / 晚间复盘 / 周计划 / 情报雷达 / 健康巡检）
-- **研发驾驶舱** — 多视角 + 运行态 + 里程碑 + Issue 同步
-- **Web 配置中心** — 6 步向导（端口 → 项目 → 模型 → 飞书 → Discord/子代理 → 应用）
+- **8 面板驾驶舱** — 看板 / 监控 / 角色 / 模板 / 技能 / 会话 / 配置 / 总览（Vue3 + TailwindCSS）
+- **Web 配置中心** — 分组折叠式配置面板
 
 ### 多代理协同
 - **共享工作区** `shared-context/` — 优先级 / 圆桌记录 / 角色产出 / 用户反馈
@@ -37,17 +39,28 @@
 - **pre-commit hook** `make hook` 一键安装本地检查
 - **Makefile** launch / install / start / stop / health / check / backup / restore / test
 
+### 编排引擎
+- **状态机** 任务生命周期流转：DRAFT → QUEUED → RUNNING → REVIEW → APPROVED → DONE
+- **审核关卡** REVIEW 阶段 approve/reject 判定 + 退回重跑
+- **Skill 管理器** 远程 Skill 安装/更新/卸载 + manifest 校验
+- **7 个 workflow 模板** default / requirement-review / bugfix / release-retro / code-sprint / incident-response / feature-delivery
+- **文件锁** 跨进程安全读写
+- **灰度开关** `ORCHESTRATOR_ENABLED` 控制编排引擎启停
+
 ## Repository Layout
 
 ```
+engine/              编排引擎（状态机 / 审核关卡 / 编排器 / 分派 / Skill 管理）
+server/              后端分层（Router / Handlers / Services / Middleware）
+frontend/console-vue Vue3 面板系统（8 个模块化面板 + TailwindCSS）
 scripts/             安装 / 启动 / 停止 / 健康检查 / 备份恢复 / watchdog
-templates/           配置模板（cron / 群提示词 / exec-approvals / 9 角色文件）
-web/setup.html       6 步 Web 配置中心
-dashboard/           研发驾驶舱 + Issue 同步
+templates/           配置模板（cron / 角色 manifest / workflow / exec-approvals）
+web/setup.html       旧版配置中心（回退用）
+dashboard/           旧版驾驶舱（回退用）
 deploy/              生产部署（Caddyfile / docker-compose / Dockerfile）
 docker/              Demo 模式（静态数据 + 容器入口）
-tests/               单元测试
-docs/                使用与架构文档
+tests/               单元测试 + 集成测试
+docs/                使用、架构与迁移文档
 examples/            流程示例
 Makefile             便捷命令入口
 ```
@@ -192,6 +205,7 @@ make start
 
 - [docs/getting-started.md](docs/getting-started.md) — 快速上手
 - [docs/architecture.md](docs/architecture.md) — 架构设计
+- [docs/migration-guide.md](docs/migration-guide.md) — 迁移指南
 - [docs/deployment.md](docs/deployment.md) — 部署指南
 - [docs/troubleshooting.md](docs/troubleshooting.md) — 故障排查
 - [deploy/README.md](deploy/README.md) — 生产部署

@@ -1,0 +1,10 @@
+{
+  "name": "rd-company",
+  "displayName": "研发主管",
+  "layer": "dispatcher",
+  "capabilities": ["scheduling", "standup", "sync", "retrospective", "dispatch"],
+  "reviewScope": [],
+  "wipLimit": 3,
+  "dependencies": [],
+  "cronJobs": ["研发晨会", "研发午间同步", "研发晚间复盘", "研发周计划", "系统健康巡检"]
+}

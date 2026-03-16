@@ -1,0 +1,10 @@
+{
+  "name": "role-growth",
+  "displayName": "增长分析师",
+  "layer": "executor",
+  "capabilities": ["growth-analysis", "metrics", "reporting"],
+  "reviewScope": [],
+  "wipLimit": 1,
+  "dependencies": [],
+  "cronJobs": ["每日转化分析-增长运营", "上线效果复盘-增长运营"]
+}

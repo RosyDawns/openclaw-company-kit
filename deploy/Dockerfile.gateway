@@ -4,8 +4,10 @@ RUN npm i -g @anthropics/openclaw
 
 FROM base AS runtime
 WORKDIR /app
-COPY scripts/ scripts/
-COPY templates/ templates/
-COPY dashboard/ dashboard/
 COPY .env.example .env.example
+COPY templates/ templates/
+COPY engine/ engine/
+COPY server/ server/
+COPY scripts/ scripts/
+COPY dashboard/ dashboard/
 CMD ["sh", "-c", "openclaw --profile ${OPENCLAW_PROFILE:-company} gateway start --foreground"]

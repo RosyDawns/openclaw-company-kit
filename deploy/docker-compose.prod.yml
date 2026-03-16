@@ -21,6 +21,8 @@ services:
       dockerfile: deploy/Dockerfile.dashboard
     restart: unless-stopped
     env_file: ../.env
+    environment:
+      ORCHESTRATOR_ENABLED: "${ORCHESTRATOR_ENABLED:-0}"
     volumes:
       - openclaw-data:/root/.openclaw-${OPENCLAW_PROFILE:-company}
     ports:

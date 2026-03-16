@@ -2,9 +2,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY dashboard/rd-dashboard /app/dashboard/rd-dashboard
 COPY docker/demo_data /app/docker/demo_data
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh
+
+COPY engine/ /app/engine/
+COPY server/ /app/server/
+
+COPY dashboard/rd-dashboard /app/dashboard/rd-dashboard
 
 RUN chmod +x /app/docker/entrypoint.sh
 

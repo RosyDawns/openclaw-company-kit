@@ -1,0 +1,10 @@
+{
+  "name": "role-code-reviewer",
+  "displayName": "代码审查员",
+  "layer": "reviewer",
+  "capabilities": ["code-review", "pr-review", "security-check"],
+  "reviewScope": ["code", "security"],
+  "wipLimit": 2,
+  "dependencies": ["role-senior-dev"],
+  "cronJobs": ["角色进度同步-代码Reviewer"]
+}

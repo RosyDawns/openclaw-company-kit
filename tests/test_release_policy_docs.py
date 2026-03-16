@@ -28,7 +28,7 @@ class ReleasePolicyDocsTests(unittest.TestCase):
 
     def test_changelog_contains_060_upgrade_notes(self):
         content = CHANGELOG.read_text(encoding="utf-8")
-        self.assertIn("## 0.6.0 - 2026-03-14", content)
+        self.assertIn("## [0.6.0] - 2026-03-16", content)
         self.assertIn("### Compatibility & Upgrade Notes", content)
         self.assertIn("BREAKING: none.", content)
 

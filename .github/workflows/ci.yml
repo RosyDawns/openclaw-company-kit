@@ -45,11 +45,13 @@ jobs:
         run: |
           python3 -m py_compile dashboard/rd-dashboard/dashboard_data.py
           python3 -m py_compile scripts/control_server.py
+          for f in engine/*.py; do python3 -m py_compile "$f"; done
+          find server -name '*.py' -exec python3 -m py_compile {} +
 
       - name: Python lint (ruff)
         run: |
           pip install ruff
-          ruff check --select=E,F . --ignore=E501
+          ruff check --select=E,F engine/ server/ scripts/control_server.py dashboard/rd-dashboard/dashboard_data.py --ignore=E501,E402
 
       - name: JSON validation (all templates)
         run: |
@@ -58,19 +60,28 @@ jobs:
           jq -e . templates/workflow-jobs.requirement-review.json >/dev/null
           jq -e . templates/workflow-jobs.bugfix.json >/dev/null
           jq -e . templates/workflow-jobs.release-retro.json >/dev/null
+          jq -e . templates/workflow-jobs.code-sprint.json >/dev/null
+          jq -e . templates/workflow-jobs.incident-response.json >/dev/null
+          jq -e . templates/workflow-jobs.feature-delivery.json >/dev/null
           jq -e . templates/company-project.template.json >/dev/null
           jq -e . templates/exec-approvals.template.json >/dev/null
           jq -e . docker/demo_data/dashboard-data.json >/dev/null
           jq -e . docker/demo_data/business-metrics.json >/dev/null
+          jq -e . engine/role_config.json >/dev/null
+          jq -e . engine/review_rules.json >/dev/null
+          for f in templates/agents/*/manifest.json; do jq -e . "$f" >/dev/null; done
 
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install test dependencies
+        run: pip install pytest
+
       - name: Unit tests
         run: |
-          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          python3 -m pytest tests/ -v --tb=short
 
   smoke:
     needs: validate
@@ -83,6 +94,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install test dependencies
+        run: pip install pytest
+
       - name: Smoke tests
         run: |
-          python3 -m unittest discover -s tests -p 'test_smoke_*.py' -v
+          python3 -m pytest tests/test_smoke_control_api.py -v --tb=short

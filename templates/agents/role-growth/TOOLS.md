@@ -1,16 +1,25 @@
-# TOOLS.md - Local Notes
+# 工具和能力
 
-Skills define _how_ tools work. This file is for _your_ specifics — the stuff that's unique to your setup.
+## 内置能力
 
-## What Goes Here
+- 增长分析 — 转化漏斗、留存、活跃度分析
+- 指标追踪 — DAU/转化率/新增用户等关键指标
+- 报告生成 — 每日转化分析、上线效果复盘
 
-Things like:
+## 子服务能力（来自 hot-search）
 
-- Project-specific API endpoints
-- SSH hosts and aliases
-- GitHub repository conventions
-- Environment-specific configurations
-- Tool preferences and shortcuts
+- 热搜数据采集 — 实时热搜榜单抓取
+- 趋势分析 — 热点话题趋势识别与追踪
+- 热点追踪 — 持续监控特定话题热度变化
+
+> hot-search 作为 role-growth 的 executor_sub 子服务，数据能力通过本角色统一对外暴露。
+
+## 外部能力引用
+
+### hot-search 热搜监控
+- 能力：热搜数据采集、趋势分析
+- 调用方式：通过 hot-search 子服务获取实时热搜数据
+- 数据格式：JSON，包含 platform, keyword, rank, trend 字段
 
 ## Available Skills
 

@@ -1,0 +1,10 @@
+{
+  "name": "role-qa-test",
+  "displayName": "测试工程师",
+  "layer": "executor",
+  "capabilities": ["testing", "bug-verification", "test-planning"],
+  "reviewScope": [],
+  "wipLimit": 2,
+  "dependencies": ["role-senior-dev"],
+  "cronJobs": ["角色进度同步-测试工程师"]
+}

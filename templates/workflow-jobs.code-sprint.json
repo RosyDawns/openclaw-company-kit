@@ -1,0 +1,58 @@
+{
+  "name": "code-sprint",
+  "description": "代码冲刺流程：需求→评审→编码→代码审核→测试→发布",
+  "version": "1.0.0",
+  "estimatedDuration": "2-5 days",
+  "jobs": [
+    {
+      "name": "需求拆解",
+      "agent": "role-product",
+      "description": "将需求拆解为可执行的技术任务",
+      "timeout": 3600
+    },
+    {
+      "name": "技术评审",
+      "agent": "role-tech-director",
+      "description": "评审技术方案的合理性和可行性",
+      "isReviewGate": true,
+      "timeout": 7200
+    },
+    {
+      "name": "编码实现",
+      "agent": "role-senior-dev",
+      "description": "按照评审通过的方案进行编码",
+      "timeout": 14400
+    },
+    {
+      "name": "代码审核",
+      "agent": "role-code-reviewer",
+      "description": "审查代码质量、安全性和规范性",
+      "isReviewGate": true,
+      "timeout": 7200
+    },
+    {
+      "name": "测试验证",
+      "agent": "role-qa-test",
+      "description": "执行测试用例，验证功能和回归",
+      "timeout": 7200
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {"id": "n1", "type": "task", "role": "role-product", "taskType": "product"},
+      {"id": "g1", "type": "review_gate", "taskType": "design"},
+      {"id": "n2", "type": "task", "role": "role-senior-dev", "taskType": "code"},
+      {"id": "g2", "type": "review_gate", "taskType": "code"},
+      {"id": "n3", "type": "task", "role": "role-qa-test", "taskType": "test"}
+    ],
+    "edges": [
+      {"from": "n1", "to": "g1", "condition": "always"},
+      {"from": "g1", "to": "n2", "condition": "on_approved"},
+      {"from": "g1", "to": "n1", "condition": "on_rejected"},
+      {"from": "n2", "to": "g2", "condition": "always"},
+      {"from": "g2", "to": "n3", "condition": "on_approved"},
+      {"from": "g2", "to": "n2", "condition": "on_rejected"},
+      {"from": "n3", "to": null, "condition": "always"}
+    ]
+  }
+}

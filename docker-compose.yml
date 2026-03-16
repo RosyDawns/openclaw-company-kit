@@ -7,4 +7,5 @@ services:
       - "8788:8788"
     environment:
       DASHBOARD_PORT: 8788
+      ORCHESTRATOR_ENABLED: 0
     restart: unless-stopped

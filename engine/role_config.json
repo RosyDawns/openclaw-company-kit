@@ -1,0 +1,109 @@
+{
+  "roles": [
+    {
+      "name": "rd-company",
+      "display_name": "研发主管",
+      "layer": "dispatcher",
+      "capabilities": ["scheduling", "standup", "sync", "retrospective", "dispatch"],
+      "review_scope": [],
+      "wip_limit": 3,
+      "allowed_callees": ["role-tech-director", "role-code-reviewer", "role-product", "role-senior-dev", "role-qa-test", "role-growth"],
+      "cron_jobs": ["研发晨会", "研发午间同步", "研发晚间复盘", "研发周计划", "系统健康巡检"],
+      "dependencies": []
+    },
+    {
+      "name": "role-code-reviewer",
+      "display_name": "代码审查员",
+      "layer": "reviewer",
+      "capabilities": ["code-review", "pr-review", "security-check"],
+      "review_scope": ["code", "security"],
+      "wip_limit": 2,
+      "allowed_callees": ["rd-company", "role-senior-dev"],
+      "cron_jobs": ["角色进度同步-代码Reviewer"],
+      "dependencies": ["role-senior-dev"]
+    },
+    {
+      "name": "role-tech-director",
+      "display_name": "技术总监",
+      "layer": "reviewer",
+      "capabilities": ["architecture-review", "tech-decision", "design-review"],
+      "review_scope": ["design", "architecture", "ops"],
+      "wip_limit": 2,
+      "allowed_callees": ["rd-company", "role-senior-dev", "role-product"],
+      "cron_jobs": ["角色进度同步-技术总监"],
+      "dependencies": []
+    },
+    {
+      "name": "role-product",
+      "display_name": "产品经理",
+      "layer": "executor",
+      "capabilities": ["requirement-analysis", "issue-management", "user-story"],
+      "review_scope": [],
+      "wip_limit": 2,
+      "allowed_callees": ["rd-company"],
+      "cron_jobs": ["角色进度同步-产品经理"],
+      "dependencies": []
+    },
+    {
+      "name": "role-senior-dev",
+      "display_name": "高级开发",
+      "layer": "executor",
+      "capabilities": ["coding", "pr-creation", "bug-fix", "refactoring"],
+      "review_scope": [],
+      "wip_limit": 1,
+      "allowed_callees": ["rd-company"],
+      "cron_jobs": ["代码执行-高级程序员"],
+      "dependencies": ["role-code-reviewer"]
+    },
+    {
+      "name": "role-qa-test",
+      "display_name": "测试工程师",
+      "layer": "executor",
+      "capabilities": ["testing", "bug-verification", "test-planning"],
+      "review_scope": [],
+      "wip_limit": 2,
+      "allowed_callees": ["rd-company"],
+      "cron_jobs": ["角色进度同步-测试工程师"],
+      "dependencies": ["role-senior-dev"]
+    },
+    {
+      "name": "role-growth",
+      "display_name": "增长分析师",
+      "layer": "executor",
+      "capabilities": ["growth-analysis", "metrics", "reporting"],
+      "review_scope": [],
+      "wip_limit": 1,
+      "allowed_callees": ["rd-company"],
+      "cron_jobs": ["每日转化分析-增长运营", "上线效果复盘-增长运营"],
+      "dependencies": []
+    },
+    {
+      "name": "ai-tech",
+      "display_name": "AI技术雷达",
+      "layer": "dispatcher_sub",
+      "capabilities": ["tech-radar", "intelligence"],
+      "review_scope": [],
+      "wip_limit": 1,
+      "allowed_callees": ["rd-company"],
+      "cron_jobs": ["项目情报雷达"],
+      "dependencies": ["rd-company"]
+    },
+    {
+      "name": "hot-search",
+      "display_name": "热搜监控",
+      "layer": "executor_sub",
+      "capabilities": ["hot-search", "trend-analysis"],
+      "review_scope": [],
+      "wip_limit": 1,
+      "allowed_callees": ["role-growth"],
+      "cron_jobs": [],
+      "dependencies": ["role-growth"]
+    }
+  ],
+  "layer_rules": {
+    "dispatcher_can_call": ["reviewer", "executor"],
+    "executor_reports_to": ["reviewer"],
+    "reviewer_reports_to": ["dispatcher"],
+    "sub_reports_to_parent": true
+  }
+}

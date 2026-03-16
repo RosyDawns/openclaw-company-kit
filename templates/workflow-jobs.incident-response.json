@@ -1,0 +1,54 @@
+{
+  "name": "incident-response",
+  "description": "事故响应流程：告警→评估→紧急修复→验证→复盘",
+  "version": "1.0.0",
+  "estimatedDuration": "2-8 hours",
+  "priority": "P0",
+  "jobs": [
+    {
+      "name": "告警确认与影响评估",
+      "agent": "rd-company",
+      "description": "确认告警真实性，评估影响范围和严重程度",
+      "timeout": 1800
+    },
+    {
+      "name": "技术方案确认",
+      "agent": "role-tech-director",
+      "description": "快速确认修复方案（紧急通道，简化审核）",
+      "timeout": 1800
+    },
+    {
+      "name": "紧急修复",
+      "agent": "role-senior-dev",
+      "description": "执行紧急代码修复或配置变更",
+      "timeout": 7200
+    },
+    {
+      "name": "验证回归",
+      "agent": "role-qa-test",
+      "description": "验证修复是否解决问题，检查是否引入新问题",
+      "timeout": 3600
+    },
+    {
+      "name": "复盘报告",
+      "agent": "rd-company",
+      "description": "生成事故复盘报告，总结根因和改进措施",
+      "timeout": 7200
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {"id": "n1", "type": "task", "role": "rd-company", "taskType": "ops"},
+      {"id": "n2", "type": "task", "role": "role-tech-director", "taskType": "design"},
+      {"id": "n3", "type": "task", "role": "role-senior-dev", "taskType": "code"},
+      {"id": "n4", "type": "task", "role": "role-qa-test", "taskType": "test"},
+      {"id": "n5", "type": "task", "role": "rd-company", "taskType": "ops"}
+    ],
+    "edges": [
+      {"from": "n1", "to": "n2", "condition": "always"},
+      {"from": "n2", "to": "n3", "condition": "always"},
+      {"from": "n3", "to": "n4", "condition": "always"},
+      {"from": "n4", "to": "n5", "condition": "always"}
+    ]
+  }
+}

@@ -31,6 +31,17 @@ class ControlApiSmokeTests(unittest.TestCase):
         cs.AUTH_TOKEN = "smoke-token"
         cs.AUTH_TOKEN_EPHEMERAL = False
 
+        from server.handlers import config as _cfg_h
+        self._config_svc = _cfg_h._config_service
+        self._task_svc = _cfg_h._task_service
+
+        if self._config_svc is not None:
+            self._orig_svc_env_file = self._config_svc._env_file
+            self._config_svc._env_file = self.env_file
+
+        if self._task_svc is not None:
+            self._orig_svc_create_task = self._task_svc.create_task
+
         try:
             self.server = ThreadingHTTPServer(("127.0.0.1", 0), cs.ControlHandler)
         except OSError as exc:
@@ -53,6 +64,10 @@ class ControlApiSmokeTests(unittest.TestCase):
             cs.AUTH_TOKEN = self._orig_auth_token
             cs.AUTH_TOKEN_EPHEMERAL = self._orig_auth_ephemeral
             cs.create_task = self._orig_create_task
+            if self._config_svc is not None:
+                self._config_svc._env_file = self._orig_svc_env_file
+            if self._task_svc is not None:
+                self._task_svc.create_task = self._orig_svc_create_task
             self.tmpdir.cleanup()
 
     def _api(self, method: str, path: str, body: dict | None = None, token: str | None = "smoke-token"):
@@ -107,6 +122,8 @@ class ControlApiSmokeTests(unittest.TestCase):
             return {"id": f"task-{name}"}
 
         cs.create_task = fake_create_task
+        if self._task_svc is not None:
+            self._task_svc.create_task = fake_create_task
 
         status_apply, payload_apply = self._api(
             "POST",

@@ -1,0 +1,10 @@
+{
+  "name": "hot-search",
+  "displayName": "热搜监控",
+  "layer": "executor_sub",
+  "capabilities": ["hot-search", "trend-analysis"],
+  "reviewScope": [],
+  "wipLimit": 1,
+  "dependencies": ["role-growth"],
+  "cronJobs": []
+}

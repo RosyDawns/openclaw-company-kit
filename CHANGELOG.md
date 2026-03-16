@@ -1,6 +1,28 @@
 # Changelog
 
-## 0.6.0 - 2026-03-14
+## [0.6.0] - 2026-03-16
+
+### Added
+- 编排引擎（engine/）：状态机、审核关卡、流转编排器、任务分派、流水线定义
+- 3 层角色架构：路由层(Dispatcher) → 审核层(Reviewer) → 执行层(Executor)
+- 后端分层（server/）：Router + Handlers(8模块) + Services + Middleware(分页)
+- 8 个前端面板：看板、监控、角色、模板、技能、会话、配置升级、总览（Vue3 + TailwindCSS）
+- Skill 管理器：远程 Skill 安装/更新/卸载 + manifest 校验
+- 3 个新 workflow 模板：code-sprint、incident-response、feature-delivery
+- 9 个角色 manifest.json 元数据（能力声明、层级定义、触发条件）
+- 文件锁机制（engine/file_lock.py，跨进程安全读写）
+- API 网关层：统一路由注册、路径参数匹配、中间件、分页、异常处理
+- 编排引擎灰度开关 `ORCHESTRATOR_ENABLED`（默认关闭，向后兼容）
+- 18 个新 API 端点（看板/监控/角色/模板/Skill/会话）
+
+### Changed
+- `control_server.py` 路由拆分到 `server/router.py`，Handler 按功能分文件
+- SetupView 重构为分组折叠式配置面板
+- Docker 配置更新支持新模块（engine/、server/）
+
+---
+
+## 0.6.0-rc1 - 2026-03-14
 
 ### Security & Reliability
 - Removed `eval` path expansion risks in shell scripts and removed `shell=True` execution path in dashboard data builder.

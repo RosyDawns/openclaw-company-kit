@@ -1,0 +1,11 @@
+{
+  "name": "ai-tech",
+  "displayName": "AI技术雷达",
+  "layer": "dispatcher_sub",
+  "description": "rd-company 按需调用的情报子代理，负责技术情报采集与分析",
+  "capabilities": ["tech-radar", "intelligence"],
+  "reviewScope": [],
+  "wipLimit": 1,
+  "dependencies": ["rd-company"],
+  "cronJobs": ["项目情报雷达"]
+}

@@ -1,0 +1,65 @@
+{
+  "name": "feature-delivery",
+  "description": "功能交付全流程：需求→设计评审→开发→代码审核→测试→增长验证→发布",
+  "version": "1.0.0",
+  "estimatedDuration": "1-2 weeks",
+  "jobs": [
+    {
+      "name": "需求分析",
+      "agent": "role-product",
+      "description": "完成需求分析、用户故事和验收标准",
+      "timeout": 14400
+    },
+    {
+      "name": "设计评审",
+      "agent": "role-tech-director",
+      "description": "评审系统设计方案",
+      "isReviewGate": true,
+      "timeout": 7200
+    },
+    {
+      "name": "功能开发",
+      "agent": "role-senior-dev",
+      "description": "实现功能代码",
+      "timeout": 28800
+    },
+    {
+      "name": "代码审核",
+      "agent": "role-code-reviewer",
+      "description": "代码质量和安全审查",
+      "isReviewGate": true,
+      "timeout": 7200
+    },
+    {
+      "name": "功能测试",
+      "agent": "role-qa-test",
+      "description": "功能测试和回归测试",
+      "timeout": 14400
+    },
+    {
+      "name": "增长验证",
+      "agent": "role-growth",
+      "description": "验证功能对用户增长指标的影响",
+      "timeout": 14400
+    }
+  ],
+  "pipeline": {
+    "nodes": [
+      {"id": "n1", "type": "task", "role": "role-product", "taskType": "product"},
+      {"id": "g1", "type": "review_gate", "taskType": "design"},
+      {"id": "n2", "type": "task", "role": "role-senior-dev", "taskType": "code"},
+      {"id": "g2", "type": "review_gate", "taskType": "code"},
+      {"id": "n3", "type": "task", "role": "role-qa-test", "taskType": "test"},
+      {"id": "n4", "type": "task", "role": "role-growth", "taskType": "growth"}
+    ],
+    "edges": [
+      {"from": "n1", "to": "g1", "condition": "always"},
+      {"from": "g1", "to": "n2", "condition": "on_approved"},
+      {"from": "g1", "to": "n1", "condition": "on_rejected"},
+      {"from": "n2", "to": "g2", "condition": "always"},
+      {"from": "g2", "to": "n3", "condition": "on_approved"},
+      {"from": "g2", "to": "n2", "condition": "on_rejected"},
+      {"from": "n3", "to": "n4", "condition": "always"}
+    ]
+  }
+}

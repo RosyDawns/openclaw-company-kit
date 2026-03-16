@@ -1,0 +1,38 @@
+# Version control
+.git
+.github/
+.gitignore
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Development & IDE
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Node artifacts
+node_modules/
+
+# Tests & docs (not needed in production image)
+tests/
+project_document/
+*.md
+LICENSE
+
+# OS files
+.DS_Store
+Thumbs.db

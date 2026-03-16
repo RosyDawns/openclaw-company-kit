@@ -1,0 +1,34 @@
+{
+  "rules": [
+    {
+      "task_type": "code",
+      "mode": "manual",
+      "reviewer_role": "role-code-reviewer",
+      "timeout_hours": 24
+    },
+    {
+      "task_type": "design",
+      "mode": "manual",
+      "reviewer_role": "role-tech-director",
+      "timeout_hours": 48
+    },
+    {
+      "task_type": "ops",
+      "mode": "hybrid",
+      "reviewer_role": "role-tech-director",
+      "timeout_hours": 12
+    },
+    {
+      "task_type": "test",
+      "mode": "auto",
+      "reviewer_role": "role-qa-test",
+      "timeout_hours": 8
+    },
+    {
+      "task_type": "doc",
+      "mode": "auto",
+      "reviewer_role": "role-product",
+      "timeout_hours": 24
+    }
+  ]
+}

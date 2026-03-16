@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import base64
-import hashlib
 import hmac
 import json
 import mimetypes
@@ -17,15 +16,18 @@ import re
 import secrets
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT_DIR))
+
 WEB_DIR = ROOT_DIR / "web"
 DASHBOARD_DIR = ROOT_DIR / "dashboard" / "rd-dashboard"
 CONSOLE_UI_DIST = ROOT_DIR / "frontend" / "console-vue" / "dist"
@@ -542,6 +544,104 @@ def get_task(task_id: str) -> dict | None:
         }
 
 
+# ---------------------------------------------------------------------------
+# Router setup — API routes are gradually migrated here from ControlHandler.
+# Static/redirect routes remain in ControlHandler for now.
+# ---------------------------------------------------------------------------
+
+from server.router import Router
+from server.handlers import config as _config_handlers
+from server.handlers import task as _task_handlers
+from server.handlers import service as _service_handlers
+from server.handlers import kanban as _kanban_handlers
+from server.handlers import monitor as _monitor_handlers
+from server.handlers import officials as _officials_handlers
+from server.handlers import templates as _templates_handlers
+from server.handlers import sessions as _sessions_handlers
+from server.handlers import skills as _skills_handlers
+
+
+def _parse_query(qs: str) -> dict:
+    """Turn a URL query string into a flat dict (single values unwrapped)."""
+    if not qs:
+        return {}
+    out: dict = {}
+    for k, v in parse_qs(qs).items():
+        out[k] = v[0] if len(v) == 1 else v
+    return out
+
+
+def _setup_router() -> Router:
+    cs = sys.modules[__name__]
+
+    from server.services.config_service import ConfigService
+    from server.services.task_service import TaskService
+    from server.services.health_service import HealthService
+
+    config_svc = ConfigService(root_dir=ROOT_DIR, env_file=ENV_FILE, server_port=SERVER_PORT)
+    task_svc = TaskService(root_dir=ROOT_DIR, config_service=config_svc)
+    health_svc = HealthService(root_dir=ROOT_DIR, config_service=config_svc)
+
+    _config_handlers.init(cs, config_service=config_svc, health_service=health_svc, task_service=task_svc)
+    _task_handlers.init(cs, task_service=task_svc)
+    _service_handlers.init(cs, health_service=health_svc, task_service=task_svc)
+    _kanban_handlers.init(root_dir=ROOT_DIR)
+    _monitor_handlers.init(cs, health_service=health_svc, task_service=task_svc)
+    _officials_handlers.init(root_dir=ROOT_DIR)
+    _templates_handlers.init(root_dir=ROOT_DIR)
+    _sessions_handlers.init(cs, history_file=task_history_path())
+    _skills_handlers.init()
+
+    r = Router()
+
+    # -- config --
+    r.add_route("GET",  "/api/config",       _config_handlers.handle_get_config,       group="config")
+    r.add_route("POST", "/api/config/save",  _config_handlers.handle_save_config,      group="config")
+    r.add_route("POST", "/api/config/apply", _config_handlers.handle_apply_config,     group="config")
+
+    # -- service (preflight is public) --
+    r.add_route("GET",  "/api/preflight",       _service_handlers.handle_preflight, auth_required=False, group="service")
+    r.add_route("GET",  "/api/service/status",  _service_handlers.handle_service_status,  group="service")
+    r.add_route("POST", "/api/service/restart", _service_handlers.handle_service_restart, group="service")
+
+    # -- task --
+    r.add_route("GET", "/api/task/{id}", _task_handlers.handle_get_task, group="task")
+
+    # -- kanban --
+    r.add_route("GET",  "/api/kanban",      _kanban_handlers.handle_get_kanban,  group="kanban")
+    r.add_route("POST", "/api/kanban/move", _kanban_handlers.handle_kanban_move, group="kanban")
+
+    # -- monitor --
+    r.add_route("GET", "/api/monitor/services", _monitor_handlers.handle_get_services, group="monitor")
+    r.add_route("GET", "/api/monitor/metrics",  _monitor_handlers.handle_get_metrics,  group="monitor")
+    r.add_route("GET", "/api/monitor/reviews",  _monitor_handlers.handle_get_reviews,  group="monitor")
+
+    # -- officials --
+    r.add_route("GET", "/api/officials", _officials_handlers.handle_get_officials, group="officials")
+
+    # -- templates --
+    r.add_route("GET",  "/api/templates",          _templates_handlers.handle_get_templates,       group="templates")
+    r.add_route("GET",  "/api/templates/{name}",   _templates_handlers.handle_get_template_detail, group="templates")
+    r.add_route("POST", "/api/templates/activate", _templates_handlers.handle_activate_template,   group="templates")
+
+    # -- skills (use POST for remove since ControlHandler has no do_DELETE) --
+    r.add_route("GET",  "/api/skills",               _skills_handlers.handle_get_skills,   group="skills")
+    r.add_route("POST", "/api/skills/add",           _skills_handlers.handle_add_skill,    group="skills")
+    r.add_route("POST", "/api/skills/update/{name}", _skills_handlers.handle_update_skill, group="skills")
+    r.add_route("POST", "/api/skills/remove/{name}", _skills_handlers.handle_remove_skill, group="skills")
+
+    # -- sessions ({id} must be last to avoid shadowing /stats and /export) --
+    r.add_route("GET", "/api/sessions",        _sessions_handlers.handle_get_sessions,       group="sessions")
+    r.add_route("GET", "/api/sessions/stats",  _sessions_handlers.handle_get_session_stats,  group="sessions")
+    r.add_route("GET", "/api/sessions/export", _sessions_handlers.handle_export_sessions,    group="sessions")
+    r.add_route("GET", "/api/sessions/{id}",   _sessions_handlers.handle_get_session_detail, group="sessions")
+
+    return r
+
+
+_router = _setup_router()
+
+
 class ControlHandler(BaseHTTPRequestHandler):
     server_version = "OpenClawControl/1.0"
 
@@ -687,7 +787,16 @@ class ControlHandler(BaseHTTPRequestHandler):
         self._serve_file(file_path)
 
     def do_GET(self) -> None:  # pylint: disable=invalid-name
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        result = _router.dispatch(self, "GET", path, _parse_query(parsed.query), None)
+        if result is not None:
+            status = result.pop("_status", 200)
+            self._send_json(result, HTTPStatus(status))
+            return
+
+        # --- Fallback: static / redirect routes and legacy API handling ---
         ui_ready = resolved_console_ui_dist() is not None
 
         if path == "/":
@@ -770,14 +879,21 @@ class ControlHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # pylint: disable=invalid-name
         path = urlparse(self.path).path
 
-        if not self._check_auth():
-            self._send_json({"ok": False, "error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
-            return
-
         try:
             payload = self._read_json()
         except json.JSONDecodeError:
             self._send_json({"ok": False, "error": "invalid json"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        result = _router.dispatch(self, "POST", path, {}, payload)
+        if result is not None:
+            status = result.pop("_status", 200)
+            self._send_json(result, HTTPStatus(status))
+            return
+
+        # --- Fallback: legacy POST handling ---
+        if not self._check_auth():
+            self._send_json({"ok": False, "error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
             return
 
         if path == "/api/config/save":
@@ -862,10 +978,10 @@ def main() -> None:
     print(f"[control] dashboard: http://127.0.0.1:{args.port}/dashboard/")
     if resolved_console_ui_dist() is not None:
         print(f"[control] console:   http://127.0.0.1:{args.port}/ui/setup")
-    print(f"[control] auth:      Bearer token enabled")
+    print("[control] auth:      Bearer token enabled")
     if AUTH_TOKEN_EPHEMERAL:
         print(f"[control] token:     {AUTH_TOKEN}")
-        print(f"[control] hint:      set CONTROL_TOKEN in .env (or --token) to keep token stable")
+        print("[control] hint:      set CONTROL_TOKEN in .env (or --token) to keep token stable")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

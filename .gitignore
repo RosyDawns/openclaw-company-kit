@@ -13,6 +13,9 @@
 node_modules/
 frontend/console-vue/dist/
 
+**/project_document
+**/refactoring-plan.md
+
 # macOS
 .DS_Store
 Thumbs.db
