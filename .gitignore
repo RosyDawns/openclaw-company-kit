@@ -13,7 +13,10 @@
 node_modules/
 frontend/console-vue/dist/
 
-**/project_document
+# Local/private docs (do not sync to remote)
+/docs/
+/project_document/
+/documents/
 **/refactoring-plan.md
 
 # macOS

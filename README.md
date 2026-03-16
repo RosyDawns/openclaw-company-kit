@@ -60,7 +60,7 @@ dashboard/           旧版驾驶舱（回退用）
 deploy/              生产部署（Caddyfile / docker-compose / Dockerfile）
 docker/              Demo 模式（静态数据 + 容器入口）
 tests/               单元测试 + 集成测试
-docs/                使用、架构与迁移文档
+documents/           本地私有文档（项目文档 / 规划文档，不同步远端）
 examples/            流程示例
 Makefile             便捷命令入口
 ```
@@ -199,18 +199,14 @@ make start
 - CI 已集成 gitleaks 自动扫描
 - 配置中心支持 `CONTROL_TOKEN` 认证保护
 
-详见 [docs/security.md](docs/security.md)
+安全说明已迁移为本地私有文档（`documents/project/security.md`）。
 
 ## Documentation
 
-- [docs/getting-started.md](docs/getting-started.md) — 快速上手
-- [docs/architecture.md](docs/architecture.md) — 架构设计
-- [docs/migration-guide.md](docs/migration-guide.md) — 迁移指南
-- [docs/deployment.md](docs/deployment.md) — 部署指南
-- [docs/troubleshooting.md](docs/troubleshooting.md) — 故障排查
+- 本地私有文档：`documents/project/*`（项目文档）
+- 本地私有文档：`documents/planning/*`（规划与路线图）
 - [deploy/README.md](deploy/README.md) — 生产部署
 - [CHANGELOG.md](CHANGELOG.md) — 变更日志
-- [ROADMAP.md](ROADMAP.md) — 路线图
 - [CONTRIBUTING.md](CONTRIBUTING.md) — 贡献指南
 
 ## Vue3 Console UI
