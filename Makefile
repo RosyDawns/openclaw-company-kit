@@ -1,4 +1,4 @@
-.PHONY: launch install bridge start stop health check backup restore clean hook
+.PHONY: launch install bridge start stop health check backup restore clean hook ui-install ui-build ui-dev
 
 launch:
 	bash scripts/launch.sh
@@ -39,3 +39,12 @@ hook:
 clean:
 	bash scripts/stop.sh 2>/dev/null || true
 	rm -rf backups/
+
+ui-install:
+	cd frontend/console-vue && npm install
+
+ui-build:
+	cd frontend/console-vue && npm run build
+
+ui-dev:
+	cd frontend/console-vue && npm run dev

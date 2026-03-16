@@ -1,0 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
+  body {
+    @apply text-slate-800;
+    background:
+      radial-gradient(circle at 14% 12%, rgba(14, 116, 144, 0.14), transparent 36%),
+      radial-gradient(circle at 88% 8%, rgba(249, 115, 22, 0.16), transparent 32%),
+      linear-gradient(145deg, #f8fafc 0%, #eef2f8 44%, #e8edf3 100%);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply rounded-2xl border border-white/40 bg-white/75 shadow-velvet backdrop-blur;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide;
+  }
+
+  .chip-ok {
+    @apply chip bg-emerald-100 text-emerald-700;
+  }
+
+  .chip-warn {
+    @apply chip bg-amber-100 text-amber-700;
+  }
+
+  .chip-error {
+    @apply chip bg-rose-100 text-rose-700;
+  }
+}

@@ -28,6 +28,7 @@ from urllib.parse import quote, unquote, urlparse
 ROOT_DIR = Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT_DIR / "web"
 DASHBOARD_DIR = ROOT_DIR / "dashboard" / "rd-dashboard"
+CONSOLE_UI_DIST = ROOT_DIR / "frontend" / "console-vue" / "dist"
 ENV_FILE = ROOT_DIR / ".env"
 
 DEFAULT_CONFIG = {
@@ -277,6 +278,12 @@ def resolved_dashboard_dir(config: dict[str, str]) -> Path:
     if deployed.is_dir():
         return deployed
     return ROOT_DIR / "dashboard" / "rd-dashboard"
+
+
+def resolved_console_ui_dist() -> Path | None:
+    if CONSOLE_UI_DIST.is_dir() and (CONSOLE_UI_DIST / "index.html").is_file():
+        return CONSOLE_UI_DIST
+    return None
 
 
 def collect_service_status(config: dict[str, str]) -> dict:
@@ -652,8 +659,36 @@ class ControlHandler(BaseHTTPRequestHandler):
 
         self._serve_file(file_path)
 
+    def _serve_console_ui(self, path: str) -> None:
+        dist_dir = resolved_console_ui_dist()
+        if dist_dir is None:
+            self._send_text("Console UI build not found. Run: cd frontend/console-vue && npm install && npm run build", HTTPStatus.NOT_FOUND)
+            return
+
+        if path in {"/ui", "/ui/"}:
+            self._serve_file(dist_dir / "index.html")
+            return
+
+        rel = path[len("/ui/") :] if path.startswith("/ui/") else ""
+        rel_path = Path(rel)
+
+        # History mode fallback: routes like /ui/setup or /ui/dashboard/role-product
+        # should return index.html.
+        if rel and "." not in rel_path.name:
+            self._serve_file(dist_dir / "index.html")
+            return
+
+        file_path = (dist_dir / rel_path).resolve()
+        dist_root = dist_dir.resolve()
+        if dist_root not in file_path.parents and file_path != dist_root:
+            self._send_text("Forbidden", HTTPStatus.FORBIDDEN)
+            return
+
+        self._serve_file(file_path)
+
     def do_GET(self) -> None:  # pylint: disable=invalid-name
         path = urlparse(self.path).path
+        ui_ready = resolved_console_ui_dist() is not None
 
         if path == "/":
             self._redirect("/setup")
@@ -663,7 +698,14 @@ class ControlHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": False, "error": "unauthorized"}, HTTPStatus.UNAUTHORIZED)
             return
 
-        if path == "/setup":
+        if path == "/ui" or path.startswith("/ui/"):
+            self._serve_console_ui(path)
+            return
+
+        if path in {"/setup", "/setup/"}:
+            if ui_ready:
+                self._redirect("/ui/setup")
+                return
             self._serve_file(WEB_DIR / "setup.html")
             return
 
@@ -671,7 +713,19 @@ class ControlHandler(BaseHTTPRequestHandler):
             self._redirect("/dashboard/")
             return
 
+        if path == "/dashboard/":
+            if ui_ready:
+                self._redirect("/ui/dashboard")
+                return
+            self._serve_dashboard(path)
+            return
+
         if path.startswith("/dashboard/"):
+            if ui_ready:
+                rel = path[len("/dashboard/") :]
+                if rel and "." not in Path(rel).name:
+                    self._redirect("/ui" + path.rstrip("/"))
+                    return
             self._serve_dashboard(path)
             return
 
@@ -806,6 +860,8 @@ def main() -> None:
     print(f"[control] root={ROOT_DIR}")
     print(f"[control] setup:     http://127.0.0.1:{args.port}/setup")
     print(f"[control] dashboard: http://127.0.0.1:{args.port}/dashboard/")
+    if resolved_console_ui_dist() is not None:
+        print(f"[control] console:   http://127.0.0.1:{args.port}/ui/setup")
     print(f"[control] auth:      Bearer token enabled")
     if AUTH_TOKEN_EPHEMERAL:
         print(f"[control] token:     {AUTH_TOKEN}")

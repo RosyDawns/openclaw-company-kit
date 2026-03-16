@@ -11,6 +11,7 @@
 .tmp/
 .dist/
 node_modules/
+frontend/console-vue/dist/
 
 # macOS
 .DS_Store

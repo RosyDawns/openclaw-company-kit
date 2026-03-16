@@ -150,6 +150,9 @@ make start
 | `make restore ARCHIVE=...` | 从备份恢复 |
 | `make test` | 运行单元测试 |
 | `make hook` | 安装 pre-commit hook |
+| `make ui-install` | 安装新版 Vue3 驾驶舱前端依赖 |
+| `make ui-build` | 构建新版 Vue3 驾驶舱前端 (`/ui/*`) |
+| `make ui-dev` | 启动新版 Vue3 驾驶舱前端本地开发服务 |
 
 ## Environment Variables
 
@@ -195,3 +198,12 @@ make start
 - [CHANGELOG.md](CHANGELOG.md) — 变更日志
 - [ROADMAP.md](ROADMAP.md) — 路线图
 - [CONTRIBUTING.md](CONTRIBUTING.md) — 贡献指南
+
+## Vue3 Console UI
+
+- 新版配置中心与驾驶舱前端位于 `frontend/console-vue`（Vue3 + TailwindCSS）。
+- 构建后 `scripts/control_server.py` 会自动启用新版路由：
+  - `/setup` -> `/ui/setup`
+  - `/dashboard` -> `/ui/dashboard`
+  - `/dashboard/<role-id>` -> `/ui/dashboard/<role-id>`
+- 若未构建（缺少 `frontend/console-vue/dist`），系统自动回退旧版 `web/setup.html` 与 `dashboard/rd-dashboard/index.html`。
