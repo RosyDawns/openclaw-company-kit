@@ -150,6 +150,14 @@ while true; do
 
     if printf '%s' "${categories}" | grep -q "gateway_auth_scope"; then
       log "gateway auth scope issue detected, skip auto-restart"
+      if should_notify_alert "gateway_auth_scope_repair"; then
+        log "attempting gateway auth scope self-heal via doctor --fix"
+        if attempt_gateway_auth_scope_repair "watchdog"; then
+          log "gateway auth scope self-heal succeeded"
+          continue
+        fi
+        log "gateway auth scope self-heal failed"
+      fi
       if should_notify_alert "gateway_auth_scope"; then
         notify_feishu "⚠️ Gateway 鉴权作用域不足，建议：${gateway_scope_action:-运行 openclaw doctor --fix 后重试}"
       fi

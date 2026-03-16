@@ -89,6 +89,11 @@ if ! ocp gateway start 2>/dev/null; then
   echo "[WARN] gateway may not be running. If healthcheck fails, run: openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
 fi
 repair_gateway_token_mismatch
+if detect_gateway_auth_scope_issue; then
+  if ! attempt_gateway_auth_scope_repair "start"; then
+    echo "[WARN] gateway auth scope still abnormal. Run: openclaw --profile ${OPENCLAW_PROFILE} doctor --fix --non-interactive --yes"
+  fi
+fi
 
 REFRESH_INTERVAL="${REFRESH_INTERVAL:-300}"
 

@@ -189,6 +189,55 @@ raise SystemExit(1)
 '
 }
 
+gateway_error_has_auth_scope_issue() {
+  local text
+  text="$(printf '%s' "$*" | tr '[:upper:]' '[:lower:]')"
+  if printf '%s' "${text}" | grep -Eq "missing scope: *operator\\.read|missing scope|device identity required"; then
+    return 0
+  fi
+  return 1
+}
+
+detect_gateway_auth_scope_issue() {
+  local status_raw status_json status_reachable status_error gateway_status_raw
+
+  status_raw="$(ocp status --all --json 2>/dev/null || true)"
+  status_json="$(printf '%s' "${status_raw}" | extract_json_payload 2>/dev/null || true)"
+  if [ -n "${status_json}" ]; then
+    status_reachable="$(printf '%s' "${status_json}" | jq -r '.gateway.reachable // false' 2>/dev/null || echo false)"
+    status_error="$(printf '%s' "${status_json}" | jq -r '.gateway.error // ""' 2>/dev/null || true)"
+    if [ "${status_reachable}" != "true" ] && gateway_error_has_auth_scope_issue "${status_error}"; then
+      return 0
+    fi
+  fi
+
+  gateway_status_raw="$(ocp gateway status 2>&1 || true)"
+  if gateway_error_has_auth_scope_issue "${gateway_status_raw}"; then
+    return 0
+  fi
+
+  return 1
+}
+
+attempt_gateway_auth_scope_repair() {
+  local context="${1:-gateway}"
+
+  echo "[${context}] detected gateway auth scope issue, running doctor --fix"
+  if ! ocp doctor --fix --non-interactive --yes >/dev/null 2>&1; then
+    echo "[WARN] ${context}: openclaw doctor --fix failed"
+    return 1
+  fi
+
+  ocp gateway install --force >/dev/null 2>&1 || true
+  if ocp gateway start >/dev/null 2>&1; then
+    echo "[${context}] gateway auth scope repaired"
+    return 0
+  fi
+
+  echo "[WARN] ${context}: gateway restart failed after doctor --fix"
+  return 1
+}
+
 ensure_gateway_local_mode() {
   local cfg_path="${1:-${PROFILE_DIR}/openclaw.json}"
   local context="${2:-config}"
