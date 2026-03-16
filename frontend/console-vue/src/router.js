@@ -1,12 +1,14 @@
 import { createRouter, createWebHistory } from "vue-router";
 import SetupView from "./views/SetupView.vue";
 import DashboardOverviewView from "./views/DashboardOverviewView.vue";
+import DashboardRuntimeView from "./views/DashboardRuntimeView.vue";
 import DashboardRoleView from "./views/DashboardRoleView.vue";
 
 const routes = [
   { path: "/", redirect: "/setup" },
   { path: "/setup", component: SetupView },
   { path: "/dashboard", component: DashboardOverviewView },
+  { path: "/dashboard/runtime", component: DashboardRuntimeView },
   { path: "/dashboard/:roleId", component: DashboardRoleView, props: true },
   { path: "/:pathMatch(.*)*", redirect: "/setup" },
 ];
