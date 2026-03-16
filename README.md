@@ -171,6 +171,7 @@ make start
 | `OPENCLAW_ALLOW_NO_GH` | 可选 | 允许缺少 gh CLI 启动（GitHub 同步能力降级） |
 | `SYNC_PROJECT_GH_BRIDGE` | 可选 | 安装时是否自动下发 `ghissues_op` 到 `PROJECT_PATH`（默认 `1`） |
 | `SYNC_PROJECT_GH_BRIDGE_STRICT` | 可选 | 下发失败是否让安装失败（默认 `0`，仅告警） |
+| `SYNC_PROJECT_GH_BRIDGE_ON_LAUNCH` | 可选 | 启动时是否自动下发 `ghissues_op`（默认 `0`，避免配置前写入） |
 | `BACKUP_INCLUDE_TASK_SUMMARY` | 可选 | 备份时包含近 N 天任务摘要与审计日志（默认关闭） |
 | `BACKUP_TASK_SUMMARY_DAYS` | 可选 | 备份摘要窗口天数（默认 7） |
 

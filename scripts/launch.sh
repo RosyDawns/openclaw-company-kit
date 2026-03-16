@@ -22,7 +22,7 @@ mkdir -p "${RUN_DIR}"
 echo "环境检测："
 check_cmds
 
-if [ "${SYNC_PROJECT_GH_BRIDGE}" = "1" ]; then
+if [ "${SYNC_PROJECT_GH_BRIDGE}" = "1" ] && [ "${SYNC_PROJECT_GH_BRIDGE_ON_LAUNCH}" = "1" ]; then
   bridge_args=(--target "${PROJECT_PATH}")
   if [ "${SYNC_PROJECT_GH_BRIDGE_STRICT}" = "1" ]; then
     bridge_args+=(--strict)
