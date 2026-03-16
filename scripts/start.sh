@@ -86,11 +86,20 @@ repair_gateway_token_mismatch() {
 ensure_gateway_local_mode "${PROFILE_DIR}/openclaw.json" "start"
 ocp gateway install >/dev/null 2>&1 || true
 if ! ocp gateway start 2>/dev/null; then
-  echo "[WARN] gateway may not be running. If healthcheck fails, run: openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+  echo "[WARN] gateway start failed, retrying with install --force..."
+  ocp gateway install --force >/dev/null 2>&1 || true
+  ocp gateway start >/dev/null 2>&1 || true
 fi
 repair_gateway_token_mismatch
+if ! wait_gateway_rpc_ready 25; then
+  echo "[WARN] gateway may not be running. If healthcheck fails, run: openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+fi
 if detect_gateway_auth_scope_issue; then
-  if ! attempt_gateway_auth_scope_repair "start"; then
+  if attempt_gateway_auth_scope_repair "start"; then
+    if ! wait_gateway_rpc_ready 25; then
+      echo "[WARN] gateway not ready after scope repair. If healthcheck fails, run: openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+    fi
+  else
     echo "[WARN] gateway auth scope still abnormal. Run: openclaw --profile ${OPENCLAW_PROFILE} doctor --fix --non-interactive --yes"
   fi
 fi

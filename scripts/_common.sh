@@ -266,6 +266,22 @@ ensure_gateway_local_mode() {
   fi
 }
 
+# Wait until gateway RPC probe reports ok (for use after gateway start).
+wait_gateway_rpc_ready() {
+  local timeout_sec="${1:-15}"
+  local probe
+  local i
+
+  for ((i=0; i<timeout_sec; i++)); do
+    probe="$(ocp gateway status 2>&1 || true)"
+    if printf '%s' "${probe}" | grep -q 'RPC probe: ok'; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 warn_model_base_url() {
   local raw="${1:-}"
   local provider_id="${2:-unknown}"

@@ -260,21 +260,6 @@ seed_agent_model_auth_profiles() {
   echo "[install] model auth seeded for ${#target_agents[@]} agents (provider=${provider}, profile=${profile_id})"
 }
 
-wait_gateway_rpc_ready() {
-  local timeout_sec="${1:-15}"
-  local probe
-  local i
-
-  for ((i=0; i<timeout_sec; i++)); do
-    probe="$(ocp gateway status 2>&1 || true)"
-    if printf '%s' "${probe}" | grep -q 'RPC probe: ok'; then
-      return 0
-    fi
-    sleep 1
-  done
-  return 1
-}
-
 backup_file_if_exists "${PROFILE_DIR}/openclaw.json"
 backup_file_if_exists "${PROFILE_DIR}/exec-approvals.json"
 backup_file_if_exists "${SHARED_CONTEXT_DIR}/priorities.md"
@@ -360,6 +345,18 @@ case "$(printf '%s' "${WORKFLOW_TEMPLATE:-default}" | tr '[:upper:]' '[:lower:]'
   release-retro|release_retro|retro|postmortem)
     WORKFLOW_TEMPLATE_ID="release-retro"
     WORKFLOW_PROMPT_TEMPLATE="${ROOT_DIR}/templates/workflow-prompt.release-retro.txt"
+    ;;
+  code-sprint|code_sprint|sprint)
+    WORKFLOW_TEMPLATE_ID="code-sprint"
+    WORKFLOW_PROMPT_TEMPLATE="${ROOT_DIR}/templates/workflow-prompt.code-sprint.txt"
+    ;;
+  incident-response|incident_response|incident)
+    WORKFLOW_TEMPLATE_ID="incident-response"
+    WORKFLOW_PROMPT_TEMPLATE="${ROOT_DIR}/templates/workflow-prompt.incident-response.txt"
+    ;;
+  feature-delivery|feature_delivery|delivery)
+    WORKFLOW_TEMPLATE_ID="feature-delivery"
+    WORKFLOW_PROMPT_TEMPLATE="${ROOT_DIR}/templates/workflow-prompt.feature-delivery.txt"
     ;;
 esac
 
@@ -525,6 +522,10 @@ jq \
 mv "${tmp_cfg}" "${PROFILE_DIR}/openclaw.json"
 ensure_gateway_local_mode "${PROFILE_DIR}/openclaw.json" "install"
 
+# Start gateway so cron sync can run (idempotent; start may be no-op if already running).
+ocp gateway install >/dev/null 2>&1 || true
+ocp gateway start >/dev/null 2>&1 || true
+
 warn_profile_model_base_urls "${PROFILE_DIR}/openclaw.json"
 warn_agent_model_base_urls "${TARGET_AGENTS_DIR}"
 
@@ -569,6 +570,7 @@ ocp config get agents --json >/dev/null
 
 cron_synced=0
 if wait_gateway_rpc_ready 15; then
+  sleep 3
   if "${ROOT_DIR}/scripts/install-cron.sh"; then
     cron_synced=1
   fi

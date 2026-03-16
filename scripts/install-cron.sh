@@ -33,6 +33,18 @@ case "$(printf '%s' "${WORKFLOW_TEMPLATE:-default}" | tr '[:upper:]' '[:lower:]'
     WORKFLOW_TEMPLATE_ID="release-retro"
     WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.release-retro.json"
     ;;
+  code-sprint|code_sprint|sprint)
+    WORKFLOW_TEMPLATE_ID="code-sprint"
+    WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.code-sprint.json"
+    ;;
+  incident-response|incident_response|incident)
+    WORKFLOW_TEMPLATE_ID="incident-response"
+    WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.incident-response.json"
+    ;;
+  feature-delivery|feature_delivery|delivery)
+    WORKFLOW_TEMPLATE_ID="feature-delivery"
+    WORKFLOW_JOBS_TEMPLATE="${ROOT_DIR}/templates/workflow-jobs.feature-delivery.json"
+    ;;
 esac
 if [ ! -f "${WORKFLOW_JOBS_TEMPLATE}" ]; then
   echo "[ERROR] workflow jobs template not found: ${WORKFLOW_JOBS_TEMPLATE}" >&2

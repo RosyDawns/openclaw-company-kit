@@ -237,32 +237,60 @@ if [ "${gateway_reachable}" = "true" ]; then
   echo "gateway: responsive"
   echo 0 > "${FAIL_COUNT_FILE}"
 else
-  echo "gateway: UNRESPONSIVE"
-  if [ -n "${gateway_error}" ]; then
-    echo "  detail: ${gateway_error}"
-  fi
-  prev_count=$(cat "${FAIL_COUNT_FILE}" 2>/dev/null || echo 0)
-  echo $((prev_count + 1)) > "${FAIL_COUNT_FILE}"
-  SHOULD_RESTART_GATEWAY=1
   gateway_error_lc="$(printf '%s' "${gateway_error}" | tr '[:upper:]' '[:lower:]')"
-  gateway_category="gateway_fault"
-  gateway_reason="OpenClaw gateway 无响应"
-  gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
-  if [ -n "${gateway_error_lc}" ] && printf '%s' "${gateway_error_lc}" | grep -q "token mismatch"; then
-    gateway_reason="OpenClaw gateway 鉴权失败（token mismatch）"
-    gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} gateway stop && openclaw --profile ${OPENCLAW_PROFILE} gateway install --force && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
-  elif [ -n "${gateway_error_lc}" ] && printf '%s' "${gateway_error_lc}" | grep -Eq "missing scope: *operator\\.read|missing scope"; then
-    SHOULD_RESTART_GATEWAY=0
-    gateway_category="gateway_auth_scope"
-    gateway_reason="OpenClaw gateway 鉴权作用域不足（missing scope）"
-    gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} doctor --fix --non-interactive --yes；若仍失败再执行 openclaw --profile ${OPENCLAW_PROFILE} gateway install --force && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+  if [ -n "${gateway_error_lc}" ] && printf '%s' "${gateway_error_lc}" | grep -Eq "missing scope: *operator\\.read|missing scope"; then
+    echo "gateway: UNRESPONSIVE (missing scope), attempting one-time doctor --fix..."
+    if ocp doctor --fix --non-interactive --yes >/dev/null 2>&1; then
+      ocp gateway install --force >/dev/null 2>&1 || true
+      ocp gateway start >/dev/null 2>&1 || true
+      sleep 5
+      gateway_raw="$(ocp status --all --json 2>/dev/null || true)"
+      gateway_json="$(printf '%s' "${gateway_raw}" | extract_json_payload 2>/dev/null || true)"
+      if [ -n "${gateway_json}" ]; then
+        gateway_reachable="$(printf '%s' "${gateway_json}" | jq -r '.gateway.reachable // false' 2>/dev/null || echo false)"
+      fi
+      if [ "${gateway_reachable}" != "true" ]; then
+        gateway_call_raw="$(ocp gateway call status --json 2>/dev/null || true)"
+        gateway_call_json="$(printf '%s' "${gateway_call_raw}" | extract_json_payload 2>/dev/null || true)"
+        [ -n "${gateway_call_json}" ] && gateway_reachable="true"
+      fi
+      if [ "${gateway_reachable}" = "true" ]; then
+        gateway_error=""
+      fi
+    fi
   fi
-  add_classification \
-    "${gateway_category}" \
-    "critical" \
-    "${gateway_reason}" \
-    "${gateway_action}"
-  max_exit_code 2
+
+  if [ "${gateway_reachable}" = "true" ]; then
+    echo "gateway: responsive"
+    echo 0 > "${FAIL_COUNT_FILE}"
+  else
+    echo "gateway: UNRESPONSIVE"
+    if [ -n "${gateway_error}" ]; then
+      echo "  detail: ${gateway_error}"
+    fi
+    prev_count=$(cat "${FAIL_COUNT_FILE}" 2>/dev/null || echo 0)
+    echo $((prev_count + 1)) > "${FAIL_COUNT_FILE}"
+    SHOULD_RESTART_GATEWAY=1
+    gateway_error_lc="$(printf '%s' "${gateway_error}" | tr '[:upper:]' '[:lower:]')"
+    gateway_category="gateway_fault"
+    gateway_reason="OpenClaw gateway 无响应"
+    gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} gateway install && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+    if [ -n "${gateway_error_lc}" ] && printf '%s' "${gateway_error_lc}" | grep -q "token mismatch"; then
+      gateway_reason="OpenClaw gateway 鉴权失败（token mismatch）"
+      gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} gateway stop && openclaw --profile ${OPENCLAW_PROFILE} gateway install --force && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+    elif [ -n "${gateway_error_lc}" ] && printf '%s' "${gateway_error_lc}" | grep -Eq "missing scope: *operator\\.read|missing scope"; then
+      SHOULD_RESTART_GATEWAY=0
+      gateway_category="gateway_auth_scope"
+      gateway_reason="OpenClaw gateway 鉴权作用域不足（missing scope）"
+      gateway_action="运行 openclaw --profile ${OPENCLAW_PROFILE} doctor --fix --non-interactive --yes；若仍失败再执行 openclaw --profile ${OPENCLAW_PROFILE} gateway install --force && openclaw --profile ${OPENCLAW_PROFILE} gateway start"
+    fi
+    add_classification \
+      "${gateway_category}" \
+      "critical" \
+      "${gateway_reason}" \
+      "${gateway_action}"
+    max_exit_code 2
+  fi
 fi
 
 echo
